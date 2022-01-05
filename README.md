@@ -1,7 +1,7 @@
 # frida-ceserver
 
-frida-based ceserver.  
-iOS analysis is possible with Cheat Engine.
+Cross-platform frida-based ceserver.  
+Support for Android/iOS/Linux.
 
 Original by Dark Byte.
 
@@ -111,7 +111,7 @@ Uses almost the same parsing of elf files as the original ceserver.
 
 # Credits
 
-iGio90:[frida-elf](https://github.com/iGio90/frida-elf/blob/master/README.md,"frida-elf")
+iGio90:[frida-elf](https://github.com/iGio90/frida-elf)
 
 ```
 Copyright (c) 2019 Giovanni (iGio90) Rocca
