@@ -11,9 +11,12 @@ from packaging.version import Version, parse
 
 PID = 0
 API = 0
+SYMBOL_API = 0
 ARCH = 0
 SESSION = 0
 CEVERSION = ""
+TARGETOS = 0
+MANUAL_PARSER = 0
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
@@ -162,7 +165,10 @@ class BinaryWriter():
         self.base.sendall(ui64)
 
 def GetSymbolListFromFile(filename,output):
-    ret = API.GetSymbolListFromFile(filename)
+    if TARGETOS in [0,1] and MANUAL_PARSER:
+        ret = SYMBOL_API.GetSymbolListFromFile(filename)
+    else:
+        ret = API.GetSymbolListFromFile(filename)
     if ret != False and len(ret) > 0:
         bytecode = b""
         for i in range(len(ret)):
@@ -461,19 +467,25 @@ def main_thread(conn,thread_count):
         if(ret == -1):
             break
 
-def ceserver(pid,api,config,session):
+def ceserver(pid,api,symbol_api,config,session):
     global PID
     global API
+    global SYMBOL_API
     global ARCH
     global SESSION
     global CEVERSION
+    global TARGETOS
+    global MANUAL_PARSER
     
     PID = pid
     API = api
+    SYMBOL_API = symbol_api
     ARCH = config["arch"]
     SESSION = session
     CEVERSION = config["ceversion"]
-
+    TARGETOS = config["targetOS"]
+    MANUAL_PARSER = config["manualParser"]
+    
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         thread_count = 0

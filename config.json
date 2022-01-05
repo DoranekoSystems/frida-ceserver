@@ -1,8 +1,9 @@
 {
   "target": "",
-  "isMobile": 1,
+  "targetOS": 1,
   "mode": 0,
   "arch": 3,
   "fix_module_size": false,
-  "ceversion": "7.3.2"
+  "ceversion": "7.3.2",
+  "manualParser": false
 }

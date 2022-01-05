@@ -28,7 +28,7 @@ def get_device():
     return device
 
 def main(package):
-    if config["isMobile"] == 1:
+    if config["targetOS"] in [1,2]:
         device = get_device()
         apps = device.enumerate_applications()
         target = package
@@ -60,15 +60,21 @@ def main(package):
 
     with open("core.js","r") as f:
         jscode = f.read()
+    with open("symbol.js","r") as f:
+        jscode2 = f.read()
     script = session.create_script(jscode)
     script.on('message', on_message)
     script.load()
+    script2 = session.create_script(jscode2)
+    script2.on('message', on_message)
+    script2.load()
     api = script.exports
     api.SetConfig(config)
+    symbol_api = script2.exports
     if config["mode"] == 1:
         info = api.GetInfo()
         process_id = info["pid"]
-    ce.ceserver(process_id,api,config,session)
+    ce.ceserver(process_id,api,symbol_api,config,session)
 
 if __name__ == "__main__":
     args = sys.argv
