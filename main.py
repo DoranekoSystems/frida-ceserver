@@ -76,7 +76,7 @@ def main(package):
         process_id = info["pid"]
     
     if config["javaDissect"]:
-        if config["targetOS"] == 1:
+        if config["targetOS"] in [1,2]:
             print("javaDissect Enabled")
             import java_pipeserver as javapipe
             jthread = threading.Thread(target=javapipe.pipeserver,args=(process_id,session,))
