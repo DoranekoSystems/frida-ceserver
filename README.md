@@ -11,6 +11,7 @@ Install python library.
 
 ```
 pip install packaging
+pip install pywin32
 ```
 
 Install frida on iOS.
@@ -108,6 +109,13 @@ Since the part related to communication between the main unit and the ceserver d
 
 Valid for linux/android.  
 Uses almost the same parsing of elf files as the original ceserver.
+
+### javaDissect
+
+Valid for android.  
+The edit method is not supported.  
+![img](https://user-images.githubusercontent.com/96031346/148321374-ee8e51de-268a-468d-8b1e-ee17c7e6e4ca.png)
+
 
 # Credits
 
