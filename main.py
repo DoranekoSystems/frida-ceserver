@@ -58,9 +58,9 @@ def main(package):
     def on_message(message, data):
         print(message)
 
-    with open("core.js","r") as f:
+    with open("javascript/core.js","r") as f:
         jscode = f.read()
-    with open("symbol.js","r") as f:
+    with open("javascript/symbol.js","r") as f:
         jscode2 = f.read()
     script = session.create_script(jscode)
     script.on('message', on_message)
@@ -74,6 +74,13 @@ def main(package):
     if config["mode"] == 1:
         info = api.GetInfo()
         process_id = info["pid"]
+    
+    if config["javaDissect"]:
+        if config["targetOS"] == 1:
+            print("javaDissect Enabled")
+            import java_pipeserver as javapipe
+            jthread = threading.Thread(target=javapipe.pipeserver,args=(process_id,session,))
+            jthread.start()
     ce.ceserver(process_id,api,symbol_api,config,session)
 
 if __name__ == "__main__":

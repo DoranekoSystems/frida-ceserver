@@ -17,6 +17,7 @@ SESSION = 0
 CEVERSION = ""
 TARGETOS = 0
 MANUAL_PARSER = 0
+JAVA_DISSECT = 0
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
@@ -476,7 +477,8 @@ def ceserver(pid,api,symbol_api,config,session):
     global CEVERSION
     global TARGETOS
     global MANUAL_PARSER
-    
+    global JAVA_DISSECT
+
     PID = pid
     API = api
     SYMBOL_API = symbol_api
@@ -485,6 +487,7 @@ def ceserver(pid,api,symbol_api,config,session):
     CEVERSION = config["ceversion"]
     TARGETOS = config["targetOS"]
     MANUAL_PARSER = config["manualParser"]
+    JAVA_DISSECT = config["javaDissect"]
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

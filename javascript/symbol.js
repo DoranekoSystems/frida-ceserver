@@ -318,7 +318,11 @@ function Elf64(f, eh) {
 }
 
 function GetSymbolListFromFile(filename) {
-  var path = Process.getModuleByName(filename).path;
+  try {
+    var path = Process.getModuleByName(filename).path;
+  } catch (e) {
+    return -1;
+  }
   console.log(path);
   var f = fopen(path, 'r');
   if (f == 0) return -1;
