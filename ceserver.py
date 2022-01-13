@@ -8,6 +8,7 @@ from enum import IntEnum, auto
 import threading
 import random
 from packaging.version import Version, parse
+from define import OS
 
 PID = 0
 API = 0
@@ -166,7 +167,7 @@ class BinaryWriter():
         self.base.sendall(ui64)
 
 def GetSymbolListFromFile(filename,output):
-    if TARGETOS in [0,1] and MANUAL_PARSER:
+    if TARGETOS in [OS.LINUX,OS.ANDROID] and MANUAL_PARSER:
         ret = SYMBOL_API.GetSymbolListFromFile(filename)
     else:
         ret = API.GetSymbolListFromFile(filename)

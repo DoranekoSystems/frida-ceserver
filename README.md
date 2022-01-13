@@ -78,7 +78,8 @@ If you specify it, you don't need to specify the name of the target app in the a
 
 `0`:Linux  
 `1`:Android  
-`2`:iOS
+`2`:iOS  
+`3`:Windows
 
 ### mode
 
