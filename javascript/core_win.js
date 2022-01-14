@@ -1,3 +1,6 @@
+const MEM_COMMIT = 4096;
+const MEM_RESERVE = 8192;
+const MEM_RELEASE = 32768;
 const MEM_MAPPED = 262144;
 const MEM_PRIVATE = 131072;
 
@@ -173,50 +176,22 @@ rpc.exports = {
     return symbollist;
   },
   extalloc: function (preferedBase, size) {
-    var mmapPtr = Module.findExportByName(null, 'mmap');
-    var mmap = new NativeFunction(mmapPtr, 'pointer', [
+    var VirtualAllocPtr = Module.findExportByName(null, 'VirtualAlloc');
+    var VirtualAlloc = new NativeFunction(VirtualAllocPtr, 'pointer', [
       'pointer',
       'int',
       'int',
       'int',
-      'int',
-      'int',
     ]);
-    var ret = mmap(
-      ptr(preferedBase),
-      size,
-      PROT_READ | PROT_WRITE | PROT_EXEC,
-      MAP_PRIVATE | MAP_ANONYMOUS,
-      -1,
-      0
-    );
-    var address = parseInt(ret);
-    if (address != -1) {
-      allocList[address] = size;
-    }
+    var _ptr = VirtualAlloc(ptr(preferedBase), size, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    var addressPtr = VirtualAlloc(_ptr, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    var address = parseInt(addressPtr);
     return address;
   },
   extfree: function (address, size) {
-    var psize = 0;
-    var result = 0;
-    if (size == 0) {
-      if (allocList[address]) {
-        psize = allocList[address];
-        delete allocList[address];
-      } else {
-        psize = 0;
-      }
-    }
-    if (psize != 0) {
-      var munmapPtr = Module.findExportByName(null, 'munmap');
-      var munmap = new NativeFunction(munmapPtr, 'pointer', ['pointer', 'int']);
-      var ret = munmap(ptr(address), psize);
-      result = parseInt(ret);
-      if (result == -1) result = 0;
-      else result = 1;
-    } else {
-      result = 0;
-    }
+    var VirtualFreePtr = Module.findExportByName(null, 'VirtualFree');
+    var VirtualFree = new NativeFunction(VirtualFreePtr, 'int', ['pointer', 'int', 'int']);
+    var result = VirtualFree(ptr(address), size, MEM_RELEASE);
     return result;
   },
   extsetspeed: function (speed) {
@@ -227,15 +202,18 @@ rpc.exports = {
     return 1;
   },
   extcreatethread: function (startaddress, parameter) {
-    var pthread_createPtr = Module.findExportByName(null, 'pthread_create');
-    var pthread_create = new NativeFunction(pthread_createPtr, 'pointer', [
-      'pointer',
+    var CreateThreadPtr = Module.findExportByName(null, 'CreateThread');
+    var CreateThread = new NativeFunction(CreateThreadPtr, 'int', [
+      'int',
       'int',
       'pointer',
       'pointer',
+      'int',
+      'pointer',
     ]);
-    var zero_ptr = Memory.alloc(4);
-    var ret = pthread_create(zero_ptr, 0, ptr(startaddress), ptr(parameter));
-    return 1;
+    var dwThreadId = Memory.alloc(4);
+    var hThread = CreateThread(0, 0, ptr(startaddress), ptr(parameter), 0, dwThreadId);
+    if (hThread == 0) return 0;
+    else return 1;
   },
 };
