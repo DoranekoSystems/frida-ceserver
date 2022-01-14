@@ -53,8 +53,30 @@ var allocList = {};
 
 const PS = Process.pointerSize;
 
-var fix_module_size = false;
-var java_dissect = false;
+var GetCurrentProcessPtr = Module.findExportByName(null, 'GetCurrentProcess');
+var GetCurrentProcess = new NativeFunction(GetCurrentProcessPtr, 'int', []);
+var SymInitializePtr = Module.findExportByName(null, 'SymInitialize');
+var SymInitialize = new NativeFunction(SymInitializePtr, 'int', ['int', 'int', 'int']);
+var SymCleanupPtr = Module.findExportByName(null, 'SymCleanup');
+var SymCleanup = new NativeFunction(SymCleanupPtr, 'int', ['int']);
+var SymLoadModule64Ptr = Module.findExportByName(null, 'SymLoadModule64');
+var SymLoadModule64 = new NativeFunction(SymLoadModule64Ptr, 'uint64', [
+  'int',
+  'pointer',
+  'pointer',
+  'pointer',
+  'int',
+  'int',
+]);
+var SymEnumSymbolsPtr = Module.findExportByName(null, 'SymEnumSymbols');
+var SymEnumSymbols = new NativeFunction(SymEnumSymbolsPtr, 'int', [
+  'int',
+  'uint64',
+  'pointer',
+  'pointer',
+  'pointer',
+]);
+
 rpc.exports = {
   setconfig: function (config) {},
   getinfo: function () {
@@ -154,25 +176,44 @@ rpc.exports = {
     return regionInfos;
   },
   getsymbollistfromfile: function (name) {
-    try {
-      var module = Process.getModuleByName(name);
-    } catch (e) {
-      return false;
-    }
-    var symbols = module.enumerateSymbols();
     var symbollist = [];
-    for (var i = 0; i < symbols.length; i++) {
-      var baseaddress = symbols[i].address;
-      if (baseaddress <= 0) continue;
-      baseaddress = baseaddress - module.base;
-      var size = symbols[i].size;
-      var type = symbols[i].type;
-      var name = symbols[i].name;
-      if (type == 'function') {
-        type = 0;
+    var callbackFunction = new NativeCallback(
+      (p, size, p2) => {
+        var type = parseInt(p.add(0x04).readUInt());
+        var baseaddress = parseInt(p.add(0x38).readU64()) - BaseOfDll;
+        var name = p.add(0x54).readUtf8String();
         symbollist.push([baseaddress, size, type, name]);
-      }
+        return 1;
+      },
+      'int',
+      ['pointer', 'int', 'pointer']
+    );
+    var hProcess = GetCurrentProcess();
+    var BaseOfDll;
+    var Mask = Memory.allocUtf8String('*');
+    var _status;
+
+    _status = SymInitialize(hProcess, 0, 0);
+    if (_status == 0) {
+      return;
     }
+
+    var path = Process.getModuleByName(name).path;
+    BaseOfDll = SymLoadModule64(hProcess, ptr(0), Memory.allocUtf8String(path), ptr(0), 0, 0);
+    if (BaseOfDll == 0) {
+      console.log('SymInitialize Error!');
+      SymCleanup(hProcess);
+      return;
+    }
+
+    if (SymEnumSymbols(hProcess, BaseOfDll, Mask, callbackFunction, ptr(0))) {
+      //console.log('SymEnumSymbols succeeded');
+    } else {
+      // SymEnumSymbols failed
+      console.log('SymEnumSymbols failed: %d\n');
+    }
+
+    SymCleanup(hProcess);
     return symbollist;
   },
   extalloc: function (preferedBase, size) {
