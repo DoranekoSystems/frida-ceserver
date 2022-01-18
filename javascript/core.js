@@ -17,6 +17,10 @@ const MAP_SHARED = 1;
 const MAP_PRIVATE = 2;
 const MAP_ANONYMOUS = 32;
 
+const VQE_PAGEDONLY = 1;
+const VQE_DIRTYONLY = 2;
+const VQE_NOSHARED = 4;
+
 function ProtectionStringToType(protectionstring) {
   if (protectionstring.indexOf('s') != -1) return MEM_MAPPED;
   else return MEM_PRIVATE;
@@ -326,15 +330,22 @@ rpc.exports = {
     }
     return false;
   },
-  virtualqueryexfull: function () {
+  virtualqueryexfull: function (flags) {
+    var noshared = flags & VQE_NOSHARED;
     regionList = Process.enumerateRanges('r--');
     var regionSize = Object.keys(regionList).length;
     var regionInfos = [];
     for (var i = 0; i < regionSize; i++) {
       var baseaddress = parseInt(regionList[i].base);
       var size = parseInt(regionList[i].size);
+      size = size - (size % 0x1000);
       var protection = ProtectionStringToProtection(regionList[i].protection);
       var type = ProtectionStringToType(regionList[i].protection);
+      if (protection == PAGE_NOACCESS) {
+        continue;
+      } else if (type == MEM_MAPPED) {
+        if (noshared != 0) continue;
+      }
       regionInfos.push([baseaddress, size, protection, type]);
     }
     return regionInfos;

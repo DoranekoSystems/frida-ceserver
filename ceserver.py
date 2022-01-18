@@ -327,7 +327,7 @@ def handler(ns,command,thread_count):
         address = 0
         sendbyteCode = b''
         regionSize = 0
-        ret = API.VirtualQueryExFull()
+        ret = API.VirtualQueryExFull(flags)
         regionSize = len(ret)
         for ri in ret:
             protection=ri[2]
