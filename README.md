@@ -118,6 +118,17 @@ Only 「Dissect Java classes」 are valid.The edit method is not supported.
 For iOS, analyze Objective-C.  
 ![img](https://user-images.githubusercontent.com/96031346/148321374-ee8e51de-268a-468d-8b1e-ee17c7e6e4ca.png)
 
+### native_ceserver_ip
+
+If this setting is enabled, memory reading will be done by the native ceserver.  
+Cheat Engine <-> frida-ceserver <-> native-ceserver
+
+android setting:  
+Set up the ceserver as usual.  
+`adb forward tcp:52734 tcp:52734`  
+`su -c ./ceserver -p 52734`  
+"native_ceserver_ip": "127.0.0.1:52734"
+
 # Credits
 
 iGio90:[frida-elf](https://github.com/iGio90/frida-elf)

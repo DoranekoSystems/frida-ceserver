@@ -19,6 +19,7 @@ CEVERSION = ""
 TARGETOS = 0
 MANUAL_PARSER = 0
 JAVA_DISSECT = 0
+NATIVE_CESERVER_IP = 0
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
@@ -207,10 +208,13 @@ def unload_frida_script(numberStr):
     script.unload()
     script_dict.pop(numberStr)
 
-def handler(ns,command,thread_count):
+def handler(ns,nc,command,thread_count):
     global process_id
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
+    reader2 = BinaryReader(nc)
+    writer2 = BinaryWriter(nc)
+
     #print(str(thread_count)+":"+str(CECMD(command)))
     if(command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT):
         dwFlags = reader.ReadInt32()
@@ -266,7 +270,12 @@ def handler(ns,command,thread_count):
 
     elif(command == CECMD.CMD_OPENPROCESS):
         pid = reader.ReadInt32()
-        processhandle = random.randint(0,0x10000)
+        if nc != 0:
+            writer2.WriteUInt8(CECMD.CMD_OPENPROCESS)
+            writer2.WriteInt32(pid)
+            processhandle = reader2.ReadInt32()
+        else:
+            processhandle = random.randint(0,0x10000)
         print("Processhandle:"+str(processhandle))
         pHandle = processhandle
         writer.WriteInt32(processhandle)
@@ -280,7 +289,23 @@ def handler(ns,command,thread_count):
         address = reader.ReadUInt64()
         size = reader.ReadUInt32()
         compress = reader.ReadInt8()
-        ret = API.ReadProcessMemory(address,size)
+        if nc != 0:
+            writer2.WriteUInt8(CECMD.CMD_READPROCESSMEMORY)
+            writer2.WriteUInt32(handle)
+            writer2.WriteUInt64(address)
+            writer2.WriteUInt32(size)
+            writer2.WriteInt8(compress)
+            read = reader2.ReadUInt32()
+            if read == 0:
+                ret = False
+            else:
+                ret = b""
+                while True:
+                    ret += nc.recv(4096)
+                    if(len(ret) == read):
+                        break
+        else:
+            ret = API.ReadProcessMemory(address,size)
         if(compress == 0):
             if ret != False:
                 writer.WriteInt32(len(ret))
@@ -450,7 +475,7 @@ def handler(ns,command,thread_count):
         pass
     return 1
     
-def main_thread(conn,thread_count):
+def main_thread(conn,native_client,thread_count):
     while True:
         try:
             b = conn.recv(1)
@@ -459,7 +484,7 @@ def main_thread(conn,thread_count):
                 print("Peer has disconnected")
                 break
             command = unpack("<b",b)[0]
-            ret = handler(conn,command,thread_count)
+            ret = handler(conn,native_client,command,thread_count)
         except:
             import traceback
             print("EXCEPTION:"+str(CECMD(command)))
@@ -489,7 +514,8 @@ def ceserver(pid,api,symbol_api,config,session):
     TARGETOS = config["targetOS"]
     MANUAL_PARSER = config["manualParser"]
     JAVA_DISSECT = config["javaDissect"]
-    
+    NATIVE_CESERVER_IP = config["native_ceserver_ip"]
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         thread_count = 0
@@ -499,8 +525,15 @@ def ceserver(pid,api,symbol_api,config,session):
         while True:
             conn,addr = s.accept()
             print("accept",addr)
+            native_client = 0
+            if NATIVE_CESERVER_IP != "":
+                target_ip = NATIVE_CESERVER_IP.split(":")[0]
+                target_port = NATIVE_CESERVER_IP.split(":")[1]
+                native_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                native_client.connect((target_ip,int(target_port)))
+
             conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             #conn.settimeout(5000)
             thread_count += 1
-            thread = threading.Thread(target=main_thread,args=([conn,thread_count]),daemon=True)
+            thread = threading.Thread(target=main_thread,args=([conn,native_client,thread_count]),daemon=True)
             thread.start()
