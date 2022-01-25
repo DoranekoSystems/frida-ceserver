@@ -129,6 +129,9 @@ Set up the ceserver as usual.
 `su -c ./ceserver -p 52734`  
 "native_ceserver_ip": "127.0.0.1:52734"
 
+iphone setting:
+[ceserver-ios-mini](https://github.com/ds20211213/ceserver-ios-mini)
+
 # Credits
 
 iGio90:[frida-elf](https://github.com/iGio90/frida-elf)

@@ -295,15 +295,27 @@ def handler(ns,nc,command,thread_count):
             writer2.WriteUInt64(address)
             writer2.WriteUInt32(size)
             writer2.WriteInt8(compress)
-            read = reader2.ReadUInt32()
-            if read == 0:
-                ret = False
+            if(compress == 0):
+                read = reader2.ReadUInt32()
+                if read == 0:
+                    ret = False
+                else:
+                    ret = b""
+                    while True:
+                        ret += nc.recv(4096)
+                        if(len(ret) == read):
+                            break
             else:
-                ret = b""
-                while True:
-                    ret += nc.recv(4096)
-                    if(len(ret) == read):
-                        break
+                uncompressedSize = reader2.ReadUInt32()
+                compressedSize = reader2.ReadUInt32()
+                if compressedSize == 0:
+                    ret = False
+                else:
+                    ret = b""
+                    while True:
+                        ret += nc.recv(4096)
+                        if(len(ret) == compressedSize):
+                            break
         else:
             ret = API.ReadProcessMemory(address,size)
         if(compress == 0):
@@ -314,8 +326,12 @@ def handler(ns,nc,command,thread_count):
                 writer.WriteInt32(0)
         else:
             if ret != False:
-                compress_data = zlib.compress(ret,level=compress)
-                writer.WriteInt32(len(ret))
+                if nc != 0:
+                    compress_data = ret
+                else:
+                    uncompressedSize = len(ret)
+                    compress_data = zlib.compress(ret,level=compress)
+                writer.WriteInt32(uncompressedSize)
                 writer.WriteInt32(len(compress_data))
                 ns.sendall(compress_data)
             else:
