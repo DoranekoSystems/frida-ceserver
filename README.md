@@ -132,6 +132,19 @@ Set up the ceserver as usual.
 ios setting:  
 [ceserver-ios-mini](https://github.com/ds20211213/ceserver-ios-mini)
 
+### custom_symbol_loader
+
+Read the symbol file in script.json format output by il2cppdumper.  
+This can be applied to any library.
+
+example
+
+```
+"custom_symbol_loader": {
+    "libil2cpp.so":"/path/to/script.json"
+}
+```
+
 # Credits
 
 iGio90:[frida-elf](https://github.com/iGio90/frida-elf)

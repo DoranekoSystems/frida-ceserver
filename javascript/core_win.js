@@ -80,7 +80,9 @@ var SymEnumSymbols = new NativeFunction(SymEnumSymbolsPtr, 'int', [
 rpc.exports = {
   setconfig: function (config) {},
   getinfo: function () {
-    var pid = Process.pid;
+    var GetCurrentProcessIdPtr = Module.findExportByName(null, 'GetCurrentProcessId');
+    var GetCurrentProcessId = new NativeFunction(GetCurrentProcessIdPtr, 'int', []);
+    var pid = GetCurrentProcessId();
     var info = { pid: pid };
     return info;
   },

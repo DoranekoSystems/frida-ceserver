@@ -4,6 +4,7 @@ import sys
 from struct import *
 import zlib
 import time
+import json
 from enum import IntEnum, auto
 import threading
 import random
@@ -20,6 +21,7 @@ TARGETOS = 0
 MANUAL_PARSER = 0
 JAVA_DISSECT = 0
 NATIVE_CESERVER_IP = 0
+CUSTOM_SYMBOL_LOADER = []
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
@@ -176,6 +178,26 @@ def GetSymbolListFromFile(filename, output):
         ret = SYMBOL_API.GetSymbolListFromFile(filename)
     else:
         ret = API.GetSymbolListFromFile(filename)
+    if len(CUSTOM_SYMBOL_LOADER) > 0:
+        for symbolfile, filepath in CUSTOM_SYMBOL_LOADER.items():
+            if symbolfile == filename:
+                with open(filepath, encoding="utf-8") as f:
+                    jdict = json.loads(f.read().replace("\n", ""))
+                    ScriptMethod = sorted(
+                        jdict["ScriptMethod"], key=lambda x: x["Address"]
+                    )
+                    for i, method in enumerate(ScriptMethod):
+                        baseaddress = method["Address"]
+                        if i == len(ScriptMethod) - 1:
+                            size = 8
+                        else:
+                            size = (
+                                ScriptMethod[i + 1]["Address"]
+                                - ScriptMethod[i]["Address"]
+                            )
+                        _type = 0
+                        name = method["Name"]
+                        ret.append([baseaddress, size, _type, name])
     if ret != False and len(ret) > 0:
         bytecode = b""
         for i in range(len(ret)):
@@ -186,15 +208,18 @@ def GetSymbolListFromFile(filename, output):
             if len(name) > 127:
                 name = name[0:127]
             namelength = len(name)
-            tmp = pack(
-                "<Qiib" + str(namelength) + "s",
-                baseaddress,
-                size,
-                _type,
-                namelength,
-                name,
-            )
-            bytecode = b"".join([bytecode, tmp])
+            try:
+                tmp = pack(
+                    "<Qiib" + str(namelength) + "s",
+                    baseaddress,
+                    size,
+                    _type,
+                    namelength,
+                    name,
+                )
+                bytecode = b"".join([bytecode, tmp])
+            except Exception as e:
+                pass
         compress_data = zlib.compress(bytecode)
         sendall_data = pack("<iii", 0, len(compress_data) + 12, len(bytecode))
         sendall_data += compress_data
@@ -564,6 +589,7 @@ def ceserver(pid, api, symbol_api, config, session):
     global TARGETOS
     global MANUAL_PARSER
     global JAVA_DISSECT
+    global CUSTOM_SYMBOL_LOADER
 
     PID = pid
     API = api
@@ -575,6 +601,7 @@ def ceserver(pid, api, symbol_api, config, session):
     MANUAL_PARSER = config["manualParser"]
     JAVA_DISSECT = config["javaDissect"]
     NATIVE_CESERVER_IP = config["native_ceserver_ip"]
+    CUSTOM_SYMBOL_LOADER = config["custom_symbol_loader"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

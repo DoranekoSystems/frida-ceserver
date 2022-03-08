@@ -7,5 +7,6 @@
   "ceversion": "7.4",
   "manualParser": false,
   "javaDissect": false,
-  "native_ceserver_ip": ""
+  "native_ceserver_ip": "",
+  "custom_symbol_loader": ""
 }

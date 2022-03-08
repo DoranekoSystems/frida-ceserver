@@ -46,7 +46,7 @@ def main(package):
                 app_identifier = app.identifier
                 app_name = app.name
                 break
-        if mode == 0:
+        if mode == MODE.SPAWN:
             process_id = device.spawn([app_identifier])
             session = device.attach(process_id)
             device.resume(process_id)
