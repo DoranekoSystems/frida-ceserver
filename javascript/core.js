@@ -208,9 +208,14 @@ function gettimeofdayHook() {
 }
 
 var statPtr = Module.findExportByName(coreLibraryName, 'stat');
-const stat = new NativeFunction(statPtr, 'int', ['pointer', 'pointer']);
+var stat = null;
+if (statPtr != null) {
+  stat = new NativeFunction(statPtr, 'int', ['pointer', 'pointer']);
+}
 
 function getRealFileSize(filename) {
+  //not support
+  if (stat == null) return -1;
   var statStructPtr = Memory.alloc(512);
   var ret = stat(Memory.allocUtf8String(filename), statStructPtr);
   if (ret == -1) return -1;
@@ -381,6 +386,7 @@ rpc.exports = {
     return symbollist;
   },
   extalloc: function (preferedBase, size) {
+    if (allocList[preferedBase]) return preferedBase;
     var mmapPtr = Module.findExportByName(null, 'mmap');
     var mmap = new NativeFunction(mmapPtr, 'pointer', [
       'pointer',
