@@ -248,7 +248,9 @@ def debugger_thread():
         if metype == "6":
             medata = int(info["medata"], 16)
             if medata > 0x100000:
-                threadid = int(info["T05thread"], 16)
+                threadid = int(
+                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+                )
                 address = struct.unpack("<Q", bytes.fromhex(info["20"]))[0]
                 event = {
                     "debugevent": 5,
@@ -675,14 +677,18 @@ def handler(ns, nc, command, thread_count):
         tid = reader.ReadInt32()
         debugreg = reader.ReadInt32()
         wasWatchpoint = reader.ReadInt32()
-        bp = [x for x in BP_LIST if x["debugreg"] == debugreg][0]
-        address = bp["address"]
-        _type = bp["type"]
-        bpsize = bp["bpsize"]
-        LLDB.interrupt()
-        LLDB.remove_watchpoint(address, _type, bpsize)
-        BP_LIST.remove(bp)
-        writer.WriteInt32(1)
+        tmp = [x for x in BP_LIST if x["debugreg"] == debugreg]
+        if len(tmp) == 1:
+            bp = tmp[0]
+            address = bp["address"]
+            _type = bp["type"]
+            bpsize = bp["bpsize"]
+            LLDB.interrupt()
+            LLDB.remove_watchpoint(address, _type, bpsize)
+            BP_LIST.remove(bp)
+            writer.WriteInt32(1)
+        else:
+            writer.WriteInt32(1)
 
     elif command == CECMD.CMD_GETTHREADCONTEXT:
         handle = reader.ReadInt32()
