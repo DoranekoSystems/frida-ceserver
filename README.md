@@ -1,7 +1,6 @@
 # frida-ceserver
 
-Cross-platform frida-based ceserver.  
-Support for Android/iOS/Linux.
+frida-based ceserver.iOS analysis is possible with Cheat Engine.
 
 Original by Dark Byte.
 
@@ -22,6 +21,10 @@ python main.py Cydia
 # or
 
 python main.py com.saurik.Cydia
+
+# or
+
+python main.py -p ProcessId
 ```
 
 Then, connect to the Cheat Engine in network mode.

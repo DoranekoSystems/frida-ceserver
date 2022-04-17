@@ -237,9 +237,7 @@ rpc.exports = {
     java_dissect = config['javaDissect'];
   },
   getinfo: function () {
-    var getpidPtr = Module.findExportByName(coreLibraryName, 'getpid');
-    const getpid = new NativeFunction(getpidPtr, 'int', []);
-    var pid = getpid();
+    var pid = Process.id;
     var info = { pid: pid };
     return info;
   },
