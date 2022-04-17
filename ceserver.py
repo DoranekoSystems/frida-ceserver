@@ -10,6 +10,8 @@ import threading
 import random
 from packaging.version import Version, parse
 from define import OS
+from lldbauto import *
+
 
 PID = 0
 API = 0
@@ -22,6 +24,12 @@ MANUAL_PARSER = 0
 JAVA_DISSECT = 0
 NATIVE_CESERVER_IP = 0
 CUSTOM_SYMBOL_LOADER = []
+DEBUGSERVER_IP = 0
+
+LLDB = 0
+DEBUG_EVENT = []
+BP_LIST = []
+REGISTER_INFO = {}
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
@@ -228,6 +236,31 @@ def GetSymbolListFromFile(filename, output):
         output[0] = b"\x00\x00\x00\x00\x00\x00\x00\x00"
 
 
+def debugger_thread():
+    global REGISTER_INFO
+    while True:
+        result = LLDB.cont()
+        info = LLDB.parse_result(result)
+        if "metype" not in info:
+            continue
+        metype = info["metype"]
+        # Breadkpoint Exception
+        if metype == "6":
+            medata = int(info["medata"], 16)
+            if medata > 0x100000:
+                threadid = int(
+                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+                )
+                address = struct.unpack("<Q", bytes.fromhex(info["20"]))[0]
+                event = {
+                    "debugevent": 5,
+                    "threadid": threadid,
+                    "address": medata,
+                    "pc": address + 4,
+                }
+                DEBUG_EVENT.append(event)
+
+
 script_dict = {}
 
 
@@ -253,12 +286,16 @@ def unload_frida_script(numberStr):
 
 def handler(ns, nc, command, thread_count):
     global process_id
+    global LLDB
+    global BP_LIST
+    global REGISTER_INFO
+
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
     reader2 = BinaryReader(nc)
     writer2 = BinaryWriter(nc)
 
-    # print(str(thread_count)+":"+str(CECMD(command)))
+    # print(str(thread_count) + ":" + str(CECMD(command)))
     if command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT:
         dwFlags = reader.ReadInt32()
         pid = reader.ReadInt32()
@@ -553,6 +590,119 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_GETABI:
         writer.WriteInt8(1)
+
+    elif command == CECMD.CMD_STARTDEBUG:
+        handle = reader.ReadInt32()
+        target_ip = DEBUGSERVER_IP.split(":")[0]
+        target_port = int(DEBUGSERVER_IP.split(":")[1])
+        LLDB = LLDBAutomation(target_ip, target_port)
+        LLDB.attach(PID)
+        t = threading.Thread(target=debugger_thread)
+        t.start()
+        event = {
+            "debugevent": -2,
+            "threadid": PID,
+            "maxBreakpointCount": 4,
+            "maxWatchpointCount": 4,
+            "maxSharedBreakpoints": 4,
+        }
+        DEBUG_EVENT.append(event)
+        writer.WriteInt32(1)
+
+    elif command == CECMD.CMD_WAITFORDEBUGEVENT:
+        handle = reader.ReadInt32()
+        timeout = reader.ReadInt32()
+        if len(DEBUG_EVENT) > 0:
+            writer.WriteInt32(1)
+            event = DEBUG_EVENT.pop()
+            debugevent = event["debugevent"]
+            threadid = event["threadid"]
+            if debugevent == -2:
+                writer.WriteInt32(debugevent)
+                writer.WriteInt64(threadid)
+                writer.WriteInt8(event["maxBreakpointCount"])
+                writer.WriteInt8(event["maxWatchpointCount"])
+                writer.WriteInt8(event["maxSharedBreakpoints"])
+                ns.sendall(b"\x00" * 5)
+            elif debugevent == 5:
+                REGISTER_INFO["pc"] = event["pc"]
+                writer.WriteInt32(debugevent)
+                writer.WriteInt64(threadid)
+                writer.WriteUInt64(event["address"])
+        else:
+            time.sleep(timeout / 1000)
+            writer.WriteInt32(0)
+
+    elif command == CECMD.CMD_CONTINUEFROMDEBUGEVENT:
+        handle = reader.ReadInt32()
+        tid = reader.ReadInt32()
+        ignore = reader.ReadInt32()
+        writer.WriteInt32(1)
+
+    elif command == CECMD.CMD_SETBREAKPOINT:
+        handle = reader.ReadInt32()
+        tid = reader.ReadInt32()
+        debugreg = reader.ReadInt32()
+        address = reader.ReadUInt64()
+        bptype = reader.ReadInt32()
+        bpsize = reader.ReadInt32()
+
+        # executebp not support
+        if bptype == 0:
+            writer.WriteInt32(0)
+        else:
+            bpaddr_list = [l.get("address") for l in BP_LIST]
+            if address not in bpaddr_list:
+                _type = ""
+                if bptype == 1:
+                    _type = "w"
+                elif bptype == 2:
+                    _type = "r"
+                elif bptype == 3:
+                    _type = "a"
+                LLDB.interrupt()
+                LLDB.set_watchpoint(address, bpsize, _type)
+                BP_LIST.append(
+                    {
+                        "address": address,
+                        "bpsize": bpsize,
+                        "type": _type,
+                        "debugreg": debugreg,
+                    }
+                )
+            writer.WriteInt32(1)
+
+    elif command == CECMD.CMD_REMOVEBREAKPOINT:
+        handle = reader.ReadInt32()
+        tid = reader.ReadInt32()
+        debugreg = reader.ReadInt32()
+        wasWatchpoint = reader.ReadInt32()
+        tmp = [x for x in BP_LIST if x["debugreg"] == debugreg]
+        if len(tmp) == 1:
+            bp = tmp[0]
+            address = bp["address"]
+            _type = bp["type"]
+            bpsize = bp["bpsize"]
+            LLDB.interrupt()
+            LLDB.remove_watchpoint(address, _type, bpsize)
+            BP_LIST.remove(bp)
+            writer.WriteInt32(1)
+        else:
+            writer.WriteInt32(1)
+
+    elif command == CECMD.CMD_GETTHREADCONTEXT:
+        handle = reader.ReadInt32()
+        tid = reader.ReadInt32()
+        _type = reader.ReadInt32()
+        writer.WriteInt32(1)
+        writer.WriteInt32(8 * 27)
+        ns.sendall(b"\x00" * 8 * 16)
+        pc = 0
+        if "pc" in REGISTER_INFO:
+            pc = REGISTER_INFO["pc"]
+        writer.WriteUInt64(pc)
+        ns.sendall(b"\x00" * 8 * 10)
+
     else:
         pass
     return 1
@@ -589,7 +739,9 @@ def ceserver(pid, api, symbol_api, config, session):
     global TARGETOS
     global MANUAL_PARSER
     global JAVA_DISSECT
+    global NATIVE_CESERVER_IP
     global CUSTOM_SYMBOL_LOADER
+    global DEBUGSERVER_IP
 
     PID = pid
     API = api
@@ -602,6 +754,7 @@ def ceserver(pid, api, symbol_api, config, session):
     JAVA_DISSECT = config["javaDissect"]
     NATIVE_CESERVER_IP = config["native_ceserver_ip"]
     CUSTOM_SYMBOL_LOADER = config["custom_symbol_loader"]
+    DEBUGSERVER_IP = config["debugserver_ip"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

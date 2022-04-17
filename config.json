@@ -8,5 +8,6 @@
   "manualParser": false,
   "javaDissect": false,
   "native_ceserver_ip": "",
+  "debugserver_ip": "",
   "custom_symbol_loader": ""
 }
