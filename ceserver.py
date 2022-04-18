@@ -31,6 +31,8 @@ DEBUG_EVENT = []
 BP_LIST = []
 REGISTER_INFO = {}
 
+Lock = threading.Lock()
+
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
 TH32CS_SNAPPROCESS = 0x2
@@ -240,8 +242,10 @@ def debugger_thread():
     global REGISTER_INFO
     while True:
         result = LLDB.cont()
+        Lock.acquire()
         info = LLDB.parse_result(result)
         if "metype" not in info:
+            Lock.release()
             continue
         metype = info["metype"]
         # Breadkpoint Exception
@@ -259,6 +263,7 @@ def debugger_thread():
                     "pc": address + 4,
                 }
                 DEBUG_EVENT.append(event)
+        Lock.release()
 
 
 script_dict = {}
@@ -646,7 +651,6 @@ def handler(ns, nc, command, thread_count):
         address = reader.ReadUInt64()
         bptype = reader.ReadInt32()
         bpsize = reader.ReadInt32()
-
         # executebp not support
         if bptype == 0:
             writer.WriteInt32(0)
@@ -660,8 +664,11 @@ def handler(ns, nc, command, thread_count):
                     _type = "r"
                 elif bptype == 3:
                     _type = "a"
+                Lock.acquire()
                 LLDB.interrupt()
+                time.sleep(0.5)
                 LLDB.set_watchpoint(address, bpsize, _type)
+                Lock.release()
                 BP_LIST.append(
                     {
                         "address": address,
@@ -683,8 +690,11 @@ def handler(ns, nc, command, thread_count):
             address = bp["address"]
             _type = bp["type"]
             bpsize = bp["bpsize"]
+            Lock.acquire()
             LLDB.interrupt()
+            time.sleep(0.5)
             LLDB.remove_watchpoint(address, _type, bpsize)
+            Lock.release()
             BP_LIST.remove(bp)
             writer.WriteInt32(1)
         else:
