@@ -64,7 +64,7 @@ class LLDBAutomation:
         else:
             return False
 
-    def remove_watchpoint(self, address, _type, size):
+    def remove_watchpoint(self, address, size, _type):
         command = ""
         if _type == "w":
             command = "z2"
