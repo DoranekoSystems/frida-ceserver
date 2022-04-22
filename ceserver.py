@@ -28,10 +28,18 @@ DEBUGSERVER_IP = 0
 
 LLDB = 0
 DEBUG_EVENT = []
-BP_LIST = []
 REGISTER_INFO = []
-SET_WP_INFO_LIST = []
-REMOVE_WP_INFO_LIST = []
+WP_INFO_LIST = [
+    {
+        "address": 0,
+        "bpsize": 0,
+        "type": 0,
+        "switch": False,
+        "enabled": False,
+    }
+    for i in range(4)
+]
+
 Lock = threading.Lock()
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
@@ -185,7 +193,7 @@ class BinaryWriter:
 
 
 def GetSymbolListFromFile(filename, output):
-    if TARGETOS in [OS.LINUX, OS.ANDROID] and MANUAL_PARSER:
+    if TARGETOS in [OS.LINUX.value, OS.ANDROID.value] and MANUAL_PARSER:
         ret = SYMBOL_API.GetSymbolListFromFile(filename)
     else:
         ret = API.GetSymbolListFromFile(filename)
@@ -248,10 +256,8 @@ def interrupt_func():
 
 
 def debugger_thread():
-    global BP_LIST
     global REGISTER_INFO
-    global SET_WP_INFO_LIST
-    global REMOVE_WP_INFO_LIST
+    global WP_INFO_LIST
 
     while True:
         result = LLDB.cont()
@@ -269,28 +275,34 @@ def debugger_thread():
                 [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
             )
             # set watchpoint
-            for SET_WP_INFO in SET_WP_INFO_LIST:
-                address = SET_WP_INFO["address"]
-                size = SET_WP_INFO["bpsize"]
-                _type = SET_WP_INFO["type"]
-                print(f"SetWatchpoint:Address:0x{address:02x},Size:{size},Type:{_type}")
-                ret = LLDB.set_watchpoint(address, size, _type)
-                print(f"Result:{ret}")
-                if ret:
-                    SET_WP_INFO_LIST.remove(SET_WP_INFO)
+            for i in range(4):
+                wp = WP_INFO_LIST[i]
+                if wp["switch"] == True and wp["enabled"] == False:
+                    address = wp["address"]
+                    size = wp["bpsize"]
+                    _type = wp["type"]
+                    print(
+                        f"SetWatchpoint:Address:0x{address:02x},Size:{size},Type:{_type}"
+                    )
+                    ret = LLDB.set_watchpoint(address, size, _type)
+                    print(f"Result:{ret}")
+                    if ret:
+                        WP_INFO_LIST[i]["enabled"] = True
 
             # remove watchpoint
-            for REMOVE_WP_INFO in REMOVE_WP_INFO_LIST:
-                address = REMOVE_WP_INFO["address"]
-                size = REMOVE_WP_INFO["bpsize"]
-                _type = REMOVE_WP_INFO["type"]
-                print(
-                    f"RemoveWatchpoint:Address:0x{address:02x},Size:{size},Type:{_type}"
-                )
-                ret = LLDB.remove_watchpoint(address, size, _type)
-                print(f"Result:{ret}")
-                if ret:
-                    REMOVE_WP_INFO_LIST.remove(REMOVE_WP_INFO)
+            for i in range(4):
+                wp = WP_INFO_LIST[i]
+                if wp["switch"] == False and wp["enabled"] == True:
+                    address = wp["address"]
+                    size = wp["bpsize"]
+                    _type = wp["type"]
+                    print(
+                        f"RemoveWatchpoint:Address:0x{address:02x},Size:{size},Type:{_type}"
+                    )
+                    ret = LLDB.remove_watchpoint(address, size, _type)
+                    print(f"Result:{ret}")
+                    if ret:
+                        WP_INFO_LIST[i]["enabled"] = False
 
         # Breadkpoint Exception
         if metype == "6":
@@ -351,10 +363,8 @@ def unload_frida_script(numberStr):
 def handler(ns, nc, command, thread_count):
     global process_id
     global LLDB
-    global BP_LIST
     global REGISTER_INFO
-    global SET_WP_INFO_LIST
-    global REMOVE_WP_INFO_LIST
+    global WP_INFO_LIST
 
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
@@ -717,12 +727,13 @@ def handler(ns, nc, command, thread_count):
         address = reader.ReadUInt64()
         bptype = reader.ReadInt32()
         bpsize = reader.ReadInt32()
+
         # executebp not support
         if bptype == 0:
             writer.WriteInt32(0)
         else:
-            bpaddr_list = [l.get("address") for l in BP_LIST]
-            if address not in bpaddr_list:
+            wp = WP_INFO_LIST[debugreg]
+            if wp["switch"] == False and wp["enabled"] == False:
                 print("CMD_SETBREAKPOINT")
                 _type = ""
                 if bptype == 1:
@@ -735,28 +746,26 @@ def handler(ns, nc, command, thread_count):
                     "address": address,
                     "bpsize": bpsize,
                     "type": _type,
-                    "debugreg": debugreg,
+                    "switch": True,
+                    "enabled": False,
                 }
-                SET_WP_INFO_LIST.append(bp)
-                BP_LIST.append(bp)
+                WP_INFO_LIST[debugreg] = bp
                 writer.WriteInt32(1)
             else:
-                writer.WriteInt32(1)
+                writer.WriteInt32(0)
 
     elif command == CECMD.CMD_REMOVEBREAKPOINT:
         handle = reader.ReadInt32()
         tid = reader.ReadInt32()
         debugreg = reader.ReadInt32()
         wasWatchpoint = reader.ReadInt32()
-        tmp = [x for x in BP_LIST if x["debugreg"] == debugreg]
-        if len(tmp) == 1:
+        wp = WP_INFO_LIST[debugreg]
+        if wp["switch"] == True and wp["enabled"] == True:
             print("CMD_REMOVEBREAKPOINT")
-            bp = tmp[0]
-            REMOVE_WP_INFO_LIST.append(bp)
-            BP_LIST.remove(bp)
+            WP_INFO_LIST[debugreg]["switch"] = False
             writer.WriteInt32(1)
         else:
-            writer.WriteInt32(1)
+            writer.WriteInt32(0)
 
     elif command == CECMD.CMD_GETTHREADCONTEXT:
         handle = reader.ReadInt32()

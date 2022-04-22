@@ -1,6 +1,6 @@
 # frida-ceserver
 
-frida-based ceserver.iOS analysis is possible with Cheat Engine.
+frida and lldb based ceserver.iOS analysis is possible with Cheat Engine.
 
 Original by Dark Byte.
 
@@ -29,7 +29,7 @@ python main.py -p ProcessId
 
 Then, connect to the Cheat Engine in network mode.
 
-The debugger is not available!
+The debugger is currently under development!
 
 ![img](https://user-images.githubusercontent.com/56913432/120924433-baa86600-c70e-11eb-8794-ab5c28ec50b6.png)
 
@@ -79,16 +79,16 @@ If you specify it, you don't need to specify the name of the target app in the a
 
 ### targetOS
 
-`0`:Linux  
-`1`:Android  
-`2`:iOS  
-`3`:Windows
+`linux`:Linux  
+`android`:Android  
+`ios`:iOS  
+`windows`:Windows
 
 ### mode
 
 spawn is only valid for mobile device.  
-`0`:spawn  
-`1`:attach
+`spawn`:spawn mode  
+`attach`:attach mode
 
 ### arch
 

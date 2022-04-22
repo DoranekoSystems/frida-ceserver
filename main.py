@@ -37,7 +37,7 @@ def main(package, pid=None):
     mode = config["mode"]
     javaDissect = config["javaDissect"]
 
-    if targetOS in [OS.ANDROID, OS.IOS]:
+    if targetOS in [OS.ANDROID.value, OS.IOS.value]:
         device = get_device()
         if pid == None:
             apps = device.enumerate_applications()
@@ -47,7 +47,7 @@ def main(package, pid=None):
                     app_identifier = app.identifier
                     app_name = app.name
                     break
-            if mode == MODE.SPAWN:
+            if mode == MODE.SPAWN.value:
                 process_id = device.spawn([app_identifier])
                 session = device.attach(process_id)
                 device.resume(process_id)
@@ -73,7 +73,7 @@ def main(package, pid=None):
     def on_message(message, data):
         print(message)
 
-    if targetOS == OS.WINDOWS:
+    if targetOS == OS.WINDOWS.value:
         with open("javascript/core_win.js", "r") as f:
             jscode = f.read()
     else:
@@ -87,16 +87,16 @@ def main(package, pid=None):
     api = script.exports
     api.SetConfig(config)
     symbol_api = 0
-    if targetOS != OS.WINDOWS:
+    if targetOS != OS.WINDOWS.value:
         script2 = session.create_script(jscode2)
         script2.on("message", on_message)
         script2.load()
         symbol_api = script2.exports
-    if mode == MODE.ATTACH:
+    if mode == MODE.ATTACH.value:
         info = api.GetInfo()
         process_id = info["pid"]
     if javaDissect:
-        if targetOS in [OS.ANDROID, OS.IOS]:
+        if targetOS in [OS.ANDROID.value, OS.IOS.value]:
             print("javaDissect Enabled")
             import java_pipeserver as javapipe
 

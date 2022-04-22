@@ -1,15 +1,15 @@
 import os
 import sys
-from enum import IntEnum, auto
+from enum import Enum, auto
 
 
-class OS(IntEnum):
-    LINUX = 0
-    ANDROID = 1
-    IOS = 2
-    WINDOWS = 3
+class OS(Enum):
+    LINUX = "linux"
+    ANDROID = "android"
+    IOS = "ios"
+    WINDOWS = "windows"
 
 
-class MODE(IntEnum):
-    SPAWN = 0
-    ATTACH = 1
+class MODE(Enum):
+    SPAWN = "spawn"
+    ATTACH = "attach"
