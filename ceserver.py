@@ -760,12 +760,16 @@ def handler(ns, nc, command, thread_count):
         debugreg = reader.ReadInt32()
         wasWatchpoint = reader.ReadInt32()
         wp = WP_INFO_LIST[debugreg]
-        if wp["switch"] == True and wp["enabled"] == True:
-            print("CMD_REMOVEBREAKPOINT")
-            WP_INFO_LIST[debugreg]["switch"] = False
+
+        if tid != -1:
             writer.WriteInt32(1)
         else:
-            writer.WriteInt32(0)
+            if wp["switch"] == True and wp["enabled"] == True:
+                print("CMD_REMOVEBREAKPOINT")
+                WP_INFO_LIST[debugreg]["switch"] = False
+                writer.WriteInt32(1)
+            else:
+                writer.WriteInt32(0)
 
     elif command == CECMD.CMD_GETTHREADCONTEXT:
         handle = reader.ReadInt32()
