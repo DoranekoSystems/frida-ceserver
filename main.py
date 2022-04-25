@@ -36,9 +36,13 @@ def main(package, pid=None):
     targetOS = config["targetOS"]
     mode = config["mode"]
     javaDissect = config["javaDissect"]
+    frida_server_ip = config["frida_server_ip"]
 
     if targetOS in [OS.ANDROID.value, OS.IOS.value]:
-        device = get_device()
+        if frida_server_ip != "":
+            device = frida.get_device_manager().add_remote_device(frida_server_ip)
+        else:
+            device = get_device()
         if pid == None:
             apps = device.enumerate_applications()
             target = package
@@ -57,7 +61,10 @@ def main(package, pid=None):
         else:
             session = device.attach(pid)
     else:
-        device = frida.get_remote_device()
+        if frida_server_ip != "":
+            device = frida.get_device_manager().add_remote_device(frida_server_ip)
+        else:
+            device = frida.get_remote_device()
         if pid == None:
             processes = device.enumerate_processes()
             target = package

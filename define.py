@@ -8,6 +8,7 @@ class OS(Enum):
     ANDROID = "android"
     IOS = "ios"
     WINDOWS = "windows"
+    MAC = "mac"
 
 
 class MODE(Enum):

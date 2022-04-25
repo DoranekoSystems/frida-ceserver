@@ -82,7 +82,8 @@ If you specify it, you don't need to specify the name of the target app in the a
 `linux`:Linux  
 `android`:Android  
 `ios`:iOS  
-`windows`:Windows
+`windows`:Windows  
+`mac`:Mac
 
 ### mode
 
@@ -120,6 +121,13 @@ Valid for android/iOS.
 Only 「Dissect Java classes」 are valid.The edit method is not supported.  
 For iOS, analyze Objective-C.  
 ![img](https://user-images.githubusercontent.com/96031346/148321374-ee8e51de-268a-468d-8b1e-ee17c7e6e4ca.png)
+
+### frida_server_ip
+
+To connect to frida-server over the network.  
+example:  
+`./frida-server -l 0.0.0.0:12345`  
+`frida_server_ip:"192.168.11.3:12345"`
 
 ### native_ceserver_ip
 
