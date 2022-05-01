@@ -45,6 +45,10 @@ class LLDBAutomation:
         result = self.send_message("c")
         return result
 
+    def step(self, thread):
+        result = self.send_message(f"vCont;s:{thread:02x}")
+        return result
+
     def readmem(self, address, size):
         result = self.send_message(f"x{address:02x},{size}")
         return result
@@ -62,7 +66,11 @@ class LLDBAutomation:
         if result == b"OK":
             return True
         else:
-            return False
+            # Already set breakpoint
+            if result == b"E09":
+                return True
+            else:
+                return False
 
     def remove_watchpoint(self, address, size, _type):
         command = ""
@@ -76,7 +84,11 @@ class LLDBAutomation:
         if result == b"OK":
             return True
         else:
-            return False
+            # Already remove breakpoint
+            if result == b"E08":
+                return True
+            else:
+                return False
 
     def parse_result(self, result):
         _dict = {}

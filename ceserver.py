@@ -252,7 +252,7 @@ def interrupt_func():
         Lock.acquire()
         LLDB.interrupt()
         Lock.release()
-        time.sleep(0.08)
+        time.sleep(0.25)
 
 
 def debugger_thread():
@@ -270,7 +270,40 @@ def debugger_thread():
             continue
         metype = info["metype"]
 
-        if metype == "5":
+        # Breadkpoint Exception
+        if metype == "6":
+            medata = int(info["medata"], 16)
+            if medata > 0x100000:
+                threadid = int(
+                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+                )
+
+                result = LLDB.step(threadid)
+
+                register_list = []
+                for i in range(34):
+                    if i == 33:
+                        address = struct.unpack("<I", bytes.fromhex(info[f"{i:02x}"]))[
+                            0
+                        ]
+                    else:
+                        address = struct.unpack("<Q", bytes.fromhex(info[f"{i:02x}"]))[
+                            0
+                        ]
+                    # temporary
+                    if ARCH == 1:
+                        address += 4
+                    register_list.append(address)
+
+                event = {
+                    "debugevent": 5,
+                    "threadid": threadid,
+                    "address": medata,
+                    "register": register_list,
+                }
+                DEBUG_EVENT.append(event)
+
+        if metype == "5" or metype == "6":
             threadid = int(
                 [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
             )
@@ -303,36 +336,6 @@ def debugger_thread():
                     print(f"Result:{ret}")
                     if ret:
                         WP_INFO_LIST[i]["enabled"] = False
-
-        # Breadkpoint Exception
-        if metype == "6":
-            medata = int(info["medata"], 16)
-            if medata > 0x100000:
-                threadid = int(
-                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
-                )
-                register_list = []
-                for i in range(34):
-                    if i == 33:
-                        address = struct.unpack("<I", bytes.fromhex(info[f"{i:02x}"]))[
-                            0
-                        ]
-                    else:
-                        address = struct.unpack("<Q", bytes.fromhex(info[f"{i:02x}"]))[
-                            0
-                        ]
-                    # temporary
-                    if ARCH == 1:
-                        address += 4
-                    register_list.append(address)
-
-                event = {
-                    "debugevent": 5,
-                    "threadid": threadid,
-                    "address": medata,
-                    "register": register_list,
-                }
-                DEBUG_EVENT.append(event)
 
         Lock.release()
 
