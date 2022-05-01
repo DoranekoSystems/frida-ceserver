@@ -32,6 +32,8 @@ Then, connect to the Cheat Engine in network mode.
 The debugger is currently under development!
 
 ![img](https://user-images.githubusercontent.com/56913432/120924433-baa86600-c70e-11eb-8794-ab5c28ec50b6.png)
+![img2](https://user-images.githubusercontent.com/96031346/166147041-8f2e1c16-3eec-4de3-884d-a6a010c1798b.png)
+
 
 # Extended function
 
