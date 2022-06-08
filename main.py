@@ -5,6 +5,7 @@ import sys
 import ceserver as ce
 import json
 from define import OS, MODE
+from automation import *
 
 with open("config.json") as f:
     config = json.loads(f.read())
@@ -37,6 +38,17 @@ def main(package, pid=None):
     mode = config["mode"]
     javaDissect = config["javaDissect"]
     frida_server_ip = config["frida_server_ip"]
+
+    adb_auto = config["adb_auto"]
+    if adb_auto["enable"] and targetOS == OS.ANDROID.value:
+        adbauto = ADBAutomation(adb_auto)
+        if adb_auto["ceserver_path"] != "":
+            t1 = threading.Thread(target=adbauto.exec_ceserver)
+            t1.start()
+        if adb_auto["frida_server_path"] != "":
+            t2 = threading.Thread(target=adbauto.exec_frida_server)
+            t2.start()
+        time.sleep(1)
 
     if targetOS in [OS.ANDROID.value, OS.IOS.value]:
         if frida_server_ip != "":

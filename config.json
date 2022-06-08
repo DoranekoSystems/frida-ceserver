@@ -3,12 +3,17 @@
   "targetOS": "ios",
   "mode": "attach",
   "arch": 3,
-  "fix_module_size": false,
   "ceversion": "7.4",
-  "manualParser": false,
-  "javaDissect": false,
   "frida_server_ip": "",
   "native_ceserver_ip": "",
   "debugserver_ip": "",
-  "custom_symbol_loader": ""
+  "fix_module_size": false,
+  "manualParser": false,
+  "javaDissect": false,
+  "custom_symbol_loader": "",
+  "adb_auto":{
+    "enable":false,
+    "frida_server_path":"",
+    "ceserver_path":""
+  }
 }
