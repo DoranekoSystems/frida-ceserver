@@ -32,131 +32,16 @@ Then, connect to the Cheat Engine in network mode.
 The debugger is currently under development!
 
 ![img](https://user-images.githubusercontent.com/56913432/120924433-baa86600-c70e-11eb-8794-ab5c28ec50b6.png)
-![img2](https://user-images.githubusercontent.com/96031346/166147041-8f2e1c16-3eec-4de3-884d-a6a010c1798b.png)
 
+# wiki
 
-# Extended function
+[BinUtils](https://github.com/DoranekoSystems/frida-ceserver/wiki/BinUtils "BinUtils")
 
-### Run the frida javascript code from within AutoAssembler.
+[Config](https://github.com/DoranekoSystems/frida-ceserver/wiki/Config "Config")
 
-If a string is written to an address between 0 and 100, it will be interpreted as frida javascript code and executed.  
-The address is also mapped to a script number.  
-If you write "UNLOAD" with the same number, the script will be canceled.
+[Debugger](https://github.com/DoranekoSystems/frida-ceserver/wiki/Debugger "Debugger")
 
-```
-{$lua}
-[enable]
-local jscode = [[
-console.log("HELLO,WORLD!");
-]]
-writeString(0,jscode)
-[disable]
-writeString(0,[[UNLOAD]])
-```
-
-# BinUtils
-
-### ARM64 Disassembler/Assembler
-
-By default, Cheat Engine does not implement the ARM64 disassembler.  
-This can be supported by using the extension BinUtils.  
-Download android-ndk, change path_to_android_ndk in the script below to the destination and put it in the autorun folder.  
-Select View->BinUtils->ARM64 BinUtils to change the disassembly to ARM64.
-
-```
-local arm64config={}
-arm64config.Name="ARM64"
-arm64config.Description="BinUtils"
-arm64config.Architecture="aarch64"
-arm64config.Path=[[path_to_android_ndk\toolchains\aarch64-linux-android-4.9\prebuilt\windows-x86_64\bin]]
-arm64config.Prefix="aarch64-linux-android-"
-registerBinUtil(arm64config)
-```
-
-# Config
-
-### target
-
-If you specify it, you don't need to specify the name of the target app in the argument.
-
-### targetOS
-
-`linux`:Linux  
-`android`:Android  
-`ios`:iOS  
-`windows`:Windows  
-`mac`:Mac
-
-### mode
-
-spawn is only valid for mobile device.  
-`spawn`:spawn mode  
-`attach`:attach mode
-
-### arch
-
-`0`:i386  
-`1`:x86_64  
-`2`:arm  
-`3`:aarch64
-
-### fix_module_size
-
-It is not possible to get the exact size of some modules in iOS.  
-In this case, the module size will be corrected to the actual file size in order to get a larger module size.  
-`true`:Enable the above function  
-`false`:Disable the above function
-
-### ceversion
-
-Specify the version of the cheat engine itself.  
-Since the part related to communication between the main unit and the ceserver differs depending on the version, the setting is necessary.
-
-### manualParser
-
-Valid for linux/android.  
-Uses almost the same parsing of elf files as the original ceserver.
-
-### javaDissect
-
-Valid for android/iOS.  
-Only 「Dissect Java classes」 are valid.The edit method is not supported.  
-For iOS, analyze Objective-C.  
-![img](https://user-images.githubusercontent.com/96031346/148321374-ee8e51de-268a-468d-8b1e-ee17c7e6e4ca.png)
-
-### frida_server_ip
-
-To connect to frida-server over the network.  
-example:  
-`./frida-server -l 0.0.0.0:12345`  
-`frida_server_ip:"192.168.11.3:12345"`
-
-### native_ceserver_ip
-
-If this setting is enabled, memory reading will be done by the native ceserver.  
-Cheat Engine <-> frida-ceserver <-> native-ceserver
-
-android setting:  
-Set up the ceserver as usual.  
-`adb forward tcp:52734 tcp:52734`  
-`su -c ./ceserver -p 52734`  
-"native_ceserver_ip": "127.0.0.1:52734"
-
-ios setting:  
-[ceserver-ios-mini](https://github.com/ds20211213/ceserver-ios-mini)
-
-### custom_symbol_loader
-
-Read the symbol file in script.json format output by il2cppdumper.  
-This can be applied to any library.
-
-example
-
-```
-"custom_symbol_loader": {
-    "libil2cpp.so":"/path/to/script.json"
-}
-```
+[Extended function](https://github.com/DoranekoSystems/frida-ceserver/wiki/Extended-function "Extended function")
 
 # Credits
 
