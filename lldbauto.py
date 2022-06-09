@@ -45,6 +45,10 @@ class LLDBAutomation:
         result = self.send_message("c")
         return result
 
+    def cont2(self, signal, thread):
+        result = self.send_message(f"vCont;C{signal:02x}:{thread:02x};c")
+        return result
+
     def step(self, thread):
         result = self.send_message(f"vCont;s:{thread:02x}")
         return result
@@ -52,6 +56,21 @@ class LLDBAutomation:
     def readmem(self, address, size):
         result = self.send_message(f"x{address:02x},{size}")
         return result
+
+    def get_register_info(self, thread):
+        message = self.send_message(f"g;thread:{thread}").decode()
+        encode_message = ""
+        flag = False
+        for i in range(len(message)):
+            if message[i] == "*" and not flag:
+                flag = True
+                encode_message += message[i - 1] * (ord(message[i + 1]) - 29)
+            else:
+                if not flag:
+                    encode_message += message[i]
+                else:
+                    flag = False
+        return encode_message
 
     # 2:write 3:read 4:access
     def set_watchpoint(self, address, size, _type):
@@ -86,6 +105,8 @@ class LLDBAutomation:
         else:
             # Already remove breakpoint
             if result == b"E08":
+                return True
+            elif result == b"":
                 return True
             else:
                 return False

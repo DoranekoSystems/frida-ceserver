@@ -14,6 +14,7 @@
   "adb_auto":{
     "enable":false,
     "frida_server_path":"",
-    "ceserver_path":""
+    "ceserver_path":"",
+    "gdbserver_path":""
   }
 }

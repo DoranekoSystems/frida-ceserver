@@ -250,7 +250,18 @@ def GetSymbolListFromFile(filename, output):
 def interrupt_func():
     while True:
         Lock.acquire()
-        LLDB.interrupt()
+        if (
+            len(
+                [
+                    wp
+                    for wp in WP_INFO_LIST
+                    if (wp["switch"] == True and wp["enabled"] == False)
+                    or (wp["switch"] == False and wp["enabled"] == True)
+                ]
+            )
+            > 0
+        ):
+            LLDB.interrupt()
         Lock.release()
         time.sleep(0.25)
 
@@ -259,37 +270,92 @@ def debugger_thread():
     global REGISTER_INFO
     global WP_INFO_LIST
 
+    signal = -1
+    thread = -1
+    is_debugserver = TARGETOS == OS.IOS.value or TARGETOS == OS.MAC.value
     while True:
-        result = LLDB.cont()
+        if is_debugserver:
+            result = LLDB.cont()
+        else:
+            # first
+            if signal == -1:
+                result = LLDB.cont()
+            else:
+                result = LLDB.cont2(signal, thread)
         Lock.acquire()
         info = LLDB.parse_result(result)
-
-        if "metype" not in info:
-            print("Debugger Thread:info is empty.")
-            Lock.release()
-            continue
-        metype = info["metype"]
+        if is_debugserver:
+            if "metype" not in info:
+                print("Debugger Thread:info is empty.")
+                Lock.release()
+                continue
+            metype = info["metype"]
+        else:
+            if "thread" not in info:
+                print("Debugger Thread:info is empty.")
+                Lock.release()
+                continue
+            thread = int(info["thread"], 16)
+            signal = int([x for x in info.keys() if x.find("T") == 0][0][1:3], 16)
+            if signal == 2 or signal == 5:
+                signal = 0
+            # watchpoint
+            if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+                metype = "6"
+            else:
+                metype = "5"
 
         # Breadkpoint Exception
         if metype == "6":
-            medata = int(info["medata"], 16)
+            if is_debugserver:
+                medata = int(info["medata"], 16)
+            else:
+                # example: 'T05watch': '0*"7fe22293dc'
+                medata = int(
+                    [info[x] for x in info.keys() if x.find("watch") != -1][0].split(
+                        '"'
+                    )[1],
+                    16,
+                )
             if medata > 0x100000:
                 threadid = int(
                     [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
                 )
 
-                result = LLDB.step(threadid)
+                if is_debugserver:
+                    result = LLDB.step(threadid)
+                else:
+                    wp = [wp for wp in WP_INFO_LIST if wp["address"] == medata][0]
+                    ret1 = LLDB.remove_watchpoint(medata, wp["bpsize"], wp["type"])
+                    ret2 = LLDB.step(threadid)
+                    ret3 = LLDB.set_watchpoint(medata, wp["bpsize"], wp["type"])
+
+                if not is_debugserver:
+                    registers = LLDB.get_register_info(threadid)
 
                 register_list = []
                 for i in range(34):
-                    if i == 33:
-                        address = struct.unpack("<I", bytes.fromhex(info[f"{i:02x}"]))[
-                            0
-                        ]
+                    if is_debugserver:
+                        try:
+                            if i == 33:
+                                address = struct.unpack(
+                                    "<I", bytes.fromhex(info[f"{i:02x}"])
+                                )[0]
+                            else:
+                                address = struct.unpack(
+                                    "<Q", bytes.fromhex(info[f"{i:02x}"])
+                                )[0]
+
+                        except Exception as e:
+                            address = 0
                     else:
-                        address = struct.unpack("<Q", bytes.fromhex(info[f"{i:02x}"]))[
-                            0
-                        ]
+                        try:
+                            string = registers[i * 16 : i * 16 + 16]
+                            address = struct.unpack("<Q", bytes.fromhex(string))[0]
+                            if i == 32:
+                                address -= 4
+                        except Exception as e:
+                            address = 0
                     # temporary
                     if ARCH == 1:
                         address += 4

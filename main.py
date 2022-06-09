@@ -48,6 +48,9 @@ def main(package, pid=None):
         if adb_auto["frida_server_path"] != "":
             t2 = threading.Thread(target=adbauto.exec_frida_server)
             t2.start()
+        if adb_auto["gdbserver_path"] != "":
+            t3 = threading.Thread(target=adbauto.exec_gdbserver)
+            t3.start()
         time.sleep(1)
 
     if targetOS in [OS.ANDROID.value, OS.IOS.value]:
