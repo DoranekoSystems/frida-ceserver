@@ -527,7 +527,7 @@ def handler(ns, nc, command, thread_count):
         writer.WriteInt32(processhandle)
 
     elif command == CECMD.CMD_GETARCHITECTURE:
-        if parse(CEVERSION) >= parse("7.4.2"):
+        if parse(CEVERSION) >= parse("7.4.1"):
             handle = reader.ReadInt32()
         arch = ARCH
         writer.WriteInt8(arch)
