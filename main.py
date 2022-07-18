@@ -53,6 +53,17 @@ def main(package, pid=None):
             t3.start()
         time.sleep(1)
 
+    ssh_auto = config["ssh_auto"]
+    if ssh_auto["enable"] and targetOS == OS.IOS.value:
+        sshauto = SSHAutomation(ssh_auto)
+        if ssh_auto["ceserver_path"] != "":
+            t1 = threading.Thread(target=sshauto.exec_ceserver)
+            t1.start()
+        if ssh_auto["debugserver_path"] != "":
+            t2 = threading.Thread(target=sshauto.exec_debugserver)
+            t2.start()
+        time.sleep(1)
+
     if targetOS in [OS.ANDROID.value, OS.IOS.value]:
         if frida_server_ip != "":
             device = frida.get_device_manager().add_remote_device(frida_server_ip)

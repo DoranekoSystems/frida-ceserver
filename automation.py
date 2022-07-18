@@ -5,6 +5,7 @@ import re
 import time
 import threading
 import struct
+import paramiko
 
 
 class ADBAutomation:
@@ -31,3 +32,33 @@ class ADBAutomation:
         os.system(
             f"start cmd /k adb shell su -c .{self.gdbserver_path} --multi 0.0.0.0:1234"
         )
+
+
+class SSHAutomation:
+    def __init__(self, configJson):
+        self.ip = configJson["ip"]
+        self.username = configJson["username"]
+        self.password = configJson["password"]
+
+        self.ceserver_path = configJson["ceserver_path"]
+        self.debugserver_path = configJson["debugserver_path"]
+
+        self.client = paramiko.SSHClient()
+        self.client.set_missing_host_key_policy(paramiko.WarningPolicy())
+        self.client.connect(self.ip, username=self.username, password=self.password)
+
+    def exec_ceserver(self):
+        stdin, stdout, stderror = self.client.exec_command(f"{self.ceserver_path}")
+        for line in stdout:
+            print(line, end="")
+        for line in stderror:
+            print(line, end="")
+
+    def exec_debugserver(self):
+        stdin, stdout, stderror = self.client.exec_command(
+            f"{self.debugserver_path}  0.0.0.0:1234"
+        )
+        for line in stdout:
+            print(line, end="")
+        for line in stderror:
+            print(line, end="")

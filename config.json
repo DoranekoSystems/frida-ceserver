@@ -3,7 +3,7 @@
   "targetOS": "ios",
   "mode": "attach",
   "arch": 3,
-  "ceversion": "7.4",
+  "ceversion": "7.4.1",
   "frida_server_ip": "",
   "native_ceserver_ip": "",
   "debugserver_ip": "",
@@ -11,6 +11,14 @@
   "manualParser": false,
   "javaDissect": false,
   "custom_symbol_loader": "",
+  "ssh_auto":{
+    "enable":false,
+    "ip":"",
+    "username":"",
+    "password":"",
+    "ceserver_path":"",
+    "debugserver_path":""
+  },
   "adb_auto":{
     "enable":false,
     "frida_server_path":"",

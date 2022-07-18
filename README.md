@@ -1,6 +1,6 @@
 # frida-ceserver
 
-frida and lldb based ceserver.iOS analysis is possible with Cheat Engine.
+frida based ceserver.iOS analysis is possible with Cheat Engine.
 
 Original by Dark Byte.
 
@@ -11,6 +11,7 @@ Install python library.
 ```
 pip install packaging
 pip install pywin32
+pip install paramiko
 ```
 
 Install frida on iOS.
@@ -35,13 +36,13 @@ The debugger is currently under development!
 
 # wiki
 
-[BinUtils](https://github.com/DoranekoSystems/frida-ceserver/wiki/BinUtils "BinUtils")
+[BinUtils](https://github.com/DoranekoSystems/frida-ceserver/wiki/BinUtils 'BinUtils')
 
-[Config](https://github.com/DoranekoSystems/frida-ceserver/wiki/Config "Config")
+[Config](https://github.com/DoranekoSystems/frida-ceserver/wiki/Config 'Config')
 
-[Debugger](https://github.com/DoranekoSystems/frida-ceserver/wiki/Debugger "Debugger")
+[Debugger](https://github.com/DoranekoSystems/frida-ceserver/wiki/Debugger 'Debugger')
 
-[Extended function](https://github.com/DoranekoSystems/frida-ceserver/wiki/Extended-function "Extended function")
+[Extended function](https://github.com/DoranekoSystems/frida-ceserver/wiki/Extended-function 'Extended function')
 
 # Credits
 
