@@ -94,6 +94,8 @@ class CECMD(IntEnum):
     CMD_VIRTUALQUERYEXFULL = 31
     CMD_GETREGIONINFO = 32
     CMD_GETABI = 33
+    CMD_SET_CONNECTION_NAME = 34
+    CMD_CREATETOOLHELP32SNAPSHOTEX = 35
     CMD_AOBSCAN = 200
     CMD_COMMANDLIST2 = 255
 
@@ -447,6 +449,39 @@ def handler(ns, nc, command, thread_count):
         hSnapshot = random.randint(1, 0x10000)
         writer.WriteInt32(hSnapshot)
 
+    elif command == CECMD.CMD_CREATETOOLHELP32SNAPSHOTEX:
+        dwFlags = reader.ReadInt32()
+        pid = reader.ReadInt32()
+        bytecode = b""
+        if dwFlags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
+            API.Module32First()
+            while True:
+                ret = API.Module32Next()
+                if ret != False:
+                    modulename = ret[2].encode()
+                    modulenamesize = len(modulename)
+                    modulebase = int(ret[0], 16)
+                    modulepart = 0
+                    modulesize = ret[1]
+                    tmp = pack(
+                        "<iQIII" + str(modulenamesize) + "s",
+                        1,
+                        modulebase,
+                        modulepart,
+                        modulesize,
+                        modulenamesize,
+                        modulename,
+                    )
+                    bytecode = b"".join([bytecode, tmp])
+                else:
+                    break
+            tmp = pack("<iQIII", 0, 0, 0, 0, 0)
+            bytecode = b"".join([bytecode, tmp])
+            ns.sendall(bytecode)
+        else:
+            hSnapshot = random.randint(1, 0x10000)
+            writer.WriteInt32(hSnapshot)
+
     elif command == CECMD.CMD_PROCESS32FIRST or command == CECMD.CMD_PROCESS32NEXT:
         hSnapshot = reader.ReadInt32()
         print("hSnapshot:" + str(hSnapshot))
@@ -531,6 +566,10 @@ def handler(ns, nc, command, thread_count):
             handle = reader.ReadInt32()
         arch = ARCH
         writer.WriteInt8(arch)
+
+    elif command == CECMD.CMD_SET_CONNECTION_NAME:
+        size = reader.ReadInt32()
+        ns.recv(size)
 
     elif command == CECMD.CMD_READPROCESSMEMORY:
         handle = reader.ReadUInt32()
@@ -676,7 +715,10 @@ def handler(ns, nc, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.3.2"):
+        if parse(CEVERSION) >= parse("7.4.2"):
+            version = 4
+            versionstring = "CHEATENGINE Network 2.2".encode()
+        elif parse(CEVERSION) >= parse("7.3.2"):
             version = 2
             versionstring = "CHEATENGINE Network 2.1".encode()
         else:

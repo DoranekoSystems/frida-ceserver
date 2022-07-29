@@ -48,6 +48,13 @@ class SSHAutomation:
         self.client.connect(self.ip, username=self.username, password=self.password)
 
     def exec_ceserver(self):
+        # check ceserver running
+        stdin, stdout, stderror = self.client.exec_command(
+            f"ps aux | grep -i {self.ceserver_path}"
+        )
+        for line in stdout:
+            if line.find(f"{self.ceserver_path}") != -1 and line.find("grep") == -1:
+                return
         stdin, stdout, stderror = self.client.exec_command(f"{self.ceserver_path}")
         for line in stdout:
             print(line, end="")
