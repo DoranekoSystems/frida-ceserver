@@ -358,9 +358,6 @@ def debugger_thread():
                                 address -= 4
                         except Exception as e:
                             address = 0
-                    # temporary
-                    if ARCH == 1:
-                        address += 4
                     register_list.append(address)
 
                 event = {
@@ -885,24 +882,39 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_GETTHREADCONTEXT:
         handle = reader.ReadInt32()
         tid = reader.ReadInt32()
-        _type = reader.ReadInt32()
+        if parse(CEVERSION) < parse("7.4.2"):
+            _type = reader.ReadInt32()
         writer.WriteInt32(1)
-        # temporary
-        if ARCH == 1:
-            writer.WriteInt32(8 * 27)
-            ns.sendall(b"\x00" * 8 * 16)
-            pc = 0
-            if len(REGISTER_INFO) > 0:
-                pc = REGISTER_INFO[32]
-            writer.WriteUInt64(pc)
-            ns.sendall(b"\x00" * 8 * 10)
-        elif ARCH == 3:
-            writer.WriteInt32(8 * 34)
-            if len(REGISTER_INFO) > 0:
-                for value in REGISTER_INFO:
-                    writer.WriteUInt64(value)
+        if ARCH == 3:
+            if parse(CEVERSION) >= parse("7.4.2"):
+                writer.WriteInt32(808)  # structsize
+                ### Context ###
+                writer.WriteInt32(808)  # structsize
+                writer.WriteInt32(3)  # type
+                if len(REGISTER_INFO) > 0:  # general registers
+                    for value in REGISTER_INFO:
+                        writer.WriteUInt64(value)
+                else:
+                    ns.sendall(b"\x00" * 8 * 34)
+                ### ContextFP ###
+                ns.sendall(b"\x00" * 16 * 33)
             else:
-                ns.sendall(b"\x00" * 8 * 34)
+                writer.WriteInt32(8 * 34)
+                if len(REGISTER_INFO) > 0:
+                    for value in REGISTER_INFO:
+                        writer.WriteUInt64(value)
+                else:
+                    ns.sendall(b"\x00" * 8 * 34)
+
+    elif command == CECMD.CMD_SETTHREADCONTEXT:
+        if parse(CEVERSION) >= parse("7.4.2"):
+            handle = reader.ReadInt32()
+            tid = reader.ReadInt32()
+            structsize = reader.ReadInt32()
+            ns.recv(structsize)
+            writer.WriteInt32(1)
+        else:
+            print("SETTHREADCONTEXT not support.")
 
     else:
         pass
