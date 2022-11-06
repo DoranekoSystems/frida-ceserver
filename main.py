@@ -3,12 +3,12 @@ import threading
 import time
 import sys
 import ceserver as ce
-import json
+import toml
 from define import OS, MODE
 from automation import *
 
-with open("config.json") as f:
-    config = json.loads(f.read())
+with open("config.toml") as f:
+    config = toml.loads(f.read())
 
 
 def get_device():
@@ -34,10 +34,10 @@ def get_device():
 
 
 def main(package, pid=None):
-    targetOS = config["targetOS"]
-    mode = config["mode"]
-    javaDissect = config["javaDissect"]
-    frida_server_ip = config["frida_server_ip"]
+    targetOS = config["general"]["targetOS"]
+    mode = config["general"]["mode"]
+    javaDissect = config["extended_function"]["javaDissect"]
+    frida_server_ip = config["ipconfig"]["frida_server_ip"]
 
     adb_auto = config["adb_auto"]
     if adb_auto["enable"] and targetOS == OS.ANDROID.value:
@@ -146,7 +146,7 @@ def main(package, pid=None):
 
 if __name__ == "__main__":
     args = sys.argv
-    target = config["target"]
+    target = config["general"]["target"]
     if target == "":
         if args[1] == "-p" or args[1] == "--pid":
             pid = int(args[2])

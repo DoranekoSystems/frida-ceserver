@@ -9,9 +9,7 @@ Original by Dark Byte.
 Install python library.
 
 ```
-pip install packaging
-pip install pywin32
-pip install paramiko
+pip install -r requirements.txt
 ```
 
 Install frida on iOS.

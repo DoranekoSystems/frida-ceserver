@@ -959,15 +959,15 @@ def ceserver(pid, api, symbol_api, config, session):
     PID = pid
     API = api
     SYMBOL_API = symbol_api
-    ARCH = config["arch"]
+    ARCH = config["general"]["arch"]
     SESSION = session
-    CEVERSION = config["ceversion"]
-    TARGETOS = config["targetOS"]
-    MANUAL_PARSER = config["manualParser"]
-    JAVA_DISSECT = config["javaDissect"]
-    NATIVE_CESERVER_IP = config["native_ceserver_ip"]
-    CUSTOM_SYMBOL_LOADER = config["custom_symbol_loader"]
-    DEBUGSERVER_IP = config["debugserver_ip"]
+    CEVERSION = config["general"]["ceversion"]
+    TARGETOS = config["general"]["targetOS"]
+    MANUAL_PARSER = config["extended_function"]["manualParser"]
+    JAVA_DISSECT = config["extended_function"]["javaDissect"]
+    NATIVE_CESERVER_IP = config["ipconfig"]["native_ceserver_ip"]
+    CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
+    DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
