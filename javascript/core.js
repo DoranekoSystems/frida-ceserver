@@ -458,4 +458,8 @@ rpc.exports = {
     var ret = pthread_create(zero_ptr, 0, ptr(startaddress), ptr(parameter));
     return 1;
   },
+  extchangememoryprotection: function(address,size,protectionstring){
+    var ret = Memory.protect(ptr(address),size,protectionstring);
+    return ret;
+  }
 };

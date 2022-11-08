@@ -96,6 +96,7 @@ class CECMD(IntEnum):
     CMD_GETABI = 33
     CMD_SET_CONNECTION_NAME = 34
     CMD_CREATETOOLHELP32SNAPSHOTEX = 35
+    CMD_CHANGEMEMORYPROTECTION = 36
     CMD_AOBSCAN = 200
     CMD_COMMANDLIST2 = 255
 
@@ -915,6 +916,30 @@ def handler(ns, nc, command, thread_count):
             writer.WriteInt32(1)
         else:
             print("SETTHREADCONTEXT not support.")
+
+    elif command == CECMD.CMD_CHANGEMEMORYPROTECTION:
+        handle = reader.ReadInt32()
+        address = reader.ReadUInt64()
+        size = reader.ReadInt32()
+        windowsprotection = reader.ReadInt32()
+        newprotectionstr = "---"
+        if windowsprotection == PAGE_EXECUTE_READWRITE:
+            newprotectionstr = "rwx"
+        elif windowsprotection == PAGE_EXECUTE_READ:
+            newprotectionstr = "r-x"
+        elif windowsprotection == PAGE_EXECUTE:
+            newprotectionstr = "--x"
+        elif windowsprotection == PAGE_READWRITE:
+            newprotectionstr = "rw-"
+        elif windowsprotection == PAGE_READONLY:
+            newprotectionstr = "r--"
+        result = API.ExtChangeMemoryProtection(address,size,newprotectionstr)
+        if result == True:
+            ret = 1
+        else:
+            ret = 0 
+        writer.WriteInt32(ret)
+        writer.WriteInt32(windowsprotection)
 
     else:
         pass
