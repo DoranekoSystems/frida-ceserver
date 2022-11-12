@@ -4,6 +4,24 @@ frida based ceserver.iOS analysis is possible with Cheat Engine.
 
 Original by Dark Byte.
 
+# Support Platform
+
+### Memory Analyzing
+
+- iOS
+- android
+- linux
+- windows
+- mac
+
+### Debugger
+
+Implements lldb and gdb based debugger.  
+Support for `「Find out what accesses/writes this address」` only.
+
+- iOS(aarch64)
+- android(aarch64)
+
 # Usage
 
 Install python library.
