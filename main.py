@@ -38,6 +38,7 @@ def main(package, pid=None):
     mode = config["general"]["mode"]
     javaDissect = config["extended_function"]["javaDissect"]
     frida_server_ip = config["ipconfig"]["frida_server_ip"]
+    binary_path = config["general"]["binary_path"]
 
     adb_auto = config["adb_auto"]
     if adb_auto["enable"] and targetOS == OS.ANDROID.value:
@@ -99,7 +100,13 @@ def main(package, pid=None):
                     process_name = process.name
                     process_id = process.pid
                     break
-            session = device.attach(process_id)
+            if mode == MODE.SPAWN.value:
+                process_id = device.spawn([binary_path])
+                session = device.attach(process_id)
+                device.resume(process_id)
+                time.sleep(1)
+            else:
+                session = device.attach(process_id)
         else:
             session = device.attach(pid)
 
@@ -147,11 +154,26 @@ def main(package, pid=None):
 if __name__ == "__main__":
     args = sys.argv
     target = config["general"]["target"]
-    if target == "":
-        if args[1] == "-p" or args[1] == "--pid":
-            pid = int(args[2])
-            main(None, pid)
+    targetOS = config["general"]["targetOS"]
+    binary_path = config["general"]["binary_path"]
+    if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+        if target == "":
+            if args[1] == "-p" or args[1] == "--pid":
+                pid = int(args[2])
+                main(None, pid)
+            else:
+                main(args[1])
         else:
-            main(args[1])
+            main(target)
     else:
-        main(target)
+        if target == "":
+            if binary_path == "":
+                if args[1] == "-p" or args[1] == "--pid":
+                    pid = int(args[2])
+                    main(None, pid)
+                else:
+                    main(args[1])
+            else:
+                main("")
+        else:
+            main(target)
