@@ -1,10 +1,10 @@
 # frida-ceserver
 
-frida based ceserver.iOS analysis is possible with Cheat Engine.
+frida based ceserver.Fusion of cheat engine and frida.  
 
 Original by Dark Byte.
 
-# Support Platform
+# Support Platforms
 
 ### Memory Analyzing
 
