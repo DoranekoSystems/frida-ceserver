@@ -6,6 +6,12 @@ Original by Dark Byte.
 
 # Support Platforms
 
+## Host OS
+- Windows
+- Mac(Newer than CE 7.4.2)
+
+## Target OS
+
 ### Memory Analyzing
 
 - iOS
@@ -27,7 +33,13 @@ Support for `「Find out what accesses/writes this address」` only.
 Install python library.
 
 ```
+# windows
+
 pip install -r requirements.txt
+
+# mac
+
+pip install -r requirements_mac.txt
 ```
 
 Install frida on iOS.
