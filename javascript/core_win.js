@@ -53,6 +53,8 @@ var allocList = {};
 
 const PS = Process.pointerSize;
 
+Module.load('Dbghelp.dll');
+
 var GetCurrentProcessPtr = Module.findExportByName(null, 'GetCurrentProcess');
 var GetCurrentProcess = new NativeFunction(GetCurrentProcessPtr, 'int', []);
 var SymInitializePtr = Module.findExportByName(null, 'SymInitialize');
