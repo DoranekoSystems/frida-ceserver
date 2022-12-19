@@ -458,8 +458,16 @@ rpc.exports = {
     var ret = pthread_create(zero_ptr, 0, ptr(startaddress), ptr(parameter));
     return 1;
   },
-  extchangememoryprotection: function(address,size,protectionstring){
-    var ret = Memory.protect(ptr(address),size,protectionstring);
+  extchangememoryprotection: function (address, size, protectionstring) {
+    var ret = Memory.protect(ptr(address), size, protectionstring);
     return ret;
-  }
+  },
+  getthreadlist: function () {
+    var threads = Process.enumerateThreads();
+    var idlist = [];
+    for (var i = 0; i < threads.length; i++) {
+      idlist.push(parseInt(threads[i].id));
+    }
+    return idlist;
+  },
 };

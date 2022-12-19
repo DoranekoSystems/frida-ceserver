@@ -45,6 +45,7 @@ Lock = threading.Lock()
 PROCESS_ALL_ACCESS = 0x1F0FFF
 
 TH32CS_SNAPPROCESS = 0x2
+TH32CS_SNAPTHREAD = 0x4
 TH32CS_SNAPMODULE = 0x8
 
 PAGE_NOACCESS = 1
@@ -97,6 +98,15 @@ class CECMD(IntEnum):
     CMD_SET_CONNECTION_NAME = 34
     CMD_CREATETOOLHELP32SNAPSHOTEX = 35
     CMD_CHANGEMEMORYPROTECTION = 36
+    CMD_GETOPTIONS = 37
+    CMD_GETOPTIONVALUE = 38
+    CMD_SETOPTIONVALUE = 39
+    CMD_PTRACE_MMAP = 40
+    CMD_OPENNAMEDPIPE = 41
+    CMD_PIPEREAD = 42
+    CMD_PIPEWRITE = 43
+    CMD_GETCESERVERPATH = 44
+    CMD_ISANDROID = 45
     CMD_AOBSCAN = 200
     CMD_COMMANDLIST2 = 255
 
@@ -476,6 +486,11 @@ def handler(ns, nc, command, thread_count):
             tmp = pack("<iQIII", 0, 0, 0, 0, 0)
             bytecode = b"".join([bytecode, tmp])
             ns.sendall(bytecode)
+        elif dwFlags & TH32CS_SNAPTHREAD == TH32CS_SNAPTHREAD:
+            idlist = API.GetThreadList()
+            writer.WriteInt32(len(idlist))
+            for id in idlist:
+                writer.WriteInt32(id)
         else:
             hSnapshot = random.randint(1, 0x10000)
             writer.WriteInt32(hSnapshot)
@@ -713,7 +728,10 @@ def handler(ns, nc, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.4.2"):
+        if parse(CEVERSION) >= parse("7.4.3"):
+            version = 5
+            versionstring = "CHEATENGINE Network 2.2".encode()
+        elif parse(CEVERSION) >= parse("7.4.2"):
             version = 4
             versionstring = "CHEATENGINE Network 2.2".encode()
         elif parse(CEVERSION) >= parse("7.3.2"):
@@ -933,13 +951,16 @@ def handler(ns, nc, command, thread_count):
             newprotectionstr = "rw-"
         elif windowsprotection == PAGE_READONLY:
             newprotectionstr = "r--"
-        result = API.ExtChangeMemoryProtection(address,size,newprotectionstr)
+        result = API.ExtChangeMemoryProtection(address, size, newprotectionstr)
         if result == True:
             ret = 1
         else:
-            ret = 0 
+            ret = 0
         writer.WriteInt32(ret)
         writer.WriteInt32(windowsprotection)
+
+    elif command == CECMD.CMD_GETOPTIONS:
+        writer.WriteInt16(0)
 
     else:
         pass
