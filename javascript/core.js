@@ -257,8 +257,10 @@ function ReadProcessMemory_Init() {
     'pointer',
     'pointer',
   ]);
-  g_Buffer = Memory.alloc(1048576);
-  g_dstBuffer = Memory.alloc(1048576);
+
+  //Up to 10 threads can be handled simultaneously
+  g_Buffer = Memory.alloc(1048576 * 10);
+  g_dstBuffer = Memory.alloc(1048576 * 10);
   g_Task = mach_task_self();
 
   var compression_encode_bufferPtr = Module.findExportByName(null, 'compression_encode_buffer');
@@ -272,27 +274,24 @@ function ReadProcessMemory_Init() {
   ]);
 }
 
+var loop_count = 0;
 function ReadProcessMemory_Custom(address, size) {
-  while (!g_Mutex) {
-    Thread.sleep(0.00001);
-  }
-  g_Mutex = false;
+  loop_count++;
+  var start_offset = (loop_count % 10) * 1048576;
   var size_out = Memory.alloc(8);
-  mach_vm_read_overwrite(g_Task, address, size, g_Buffer, size_out);
+  mach_vm_read_overwrite(g_Task, address, size, g_Buffer.add(start_offset), size_out);
   if (size_out.readUInt() == 0) {
-    g_Mutex = true;
     return false;
   } else {
     var compress_size = compression_encode_buffer(
-      g_dstBuffer,
+      g_dstBuffer.add(start_offset),
       size,
-      g_Buffer,
+      g_Buffer.add(start_offset),
       size,
       ptr(0),
       COMPRESSION_LZ4
     );
-    var ret = ArrayBuffer.wrap(g_dstBuffer, compress_size);
-    g_Mutex = true;
+    var ret = ArrayBuffer.wrap(g_dstBuffer.add(start_offset), compress_size);
     return ret;
   }
 }
