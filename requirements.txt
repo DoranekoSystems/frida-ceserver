@@ -2,3 +2,4 @@ packaging
 pywin32
 paramiko
 toml
+lz4

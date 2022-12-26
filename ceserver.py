@@ -11,7 +11,7 @@ import random
 from packaging.version import Version, parse
 from define import OS
 from lldbauto import *
-
+import lz4.block
 
 PID = 0
 API = 0
@@ -25,6 +25,7 @@ JAVA_DISSECT = 0
 NATIVE_CESERVER_IP = 0
 CUSTOM_SYMBOL_LOADER = []
 DEBUGSERVER_IP = 0
+CUSTOM_READ_MEMORY = 0
 
 LLDB = 0
 DEBUG_EVENT = []
@@ -620,6 +621,25 @@ def handler(ns, nc, command, thread_count):
             ret = API.ReadProcessMemory(address, size)
         if compress == 0:
             if ret != False:
+                if CUSTOM_READ_MEMORY and TARGETOS == OS.IOS.value:
+                    decompress_bytes = b""
+                    tmp = ret
+                    last_uncompressed = b""
+                    # todo:bv4-
+                    while True:
+                        if (tmp[0:4] != b"bv41") or (tmp[0:4] == b"bv4$"):
+                            break
+                        uncompressed_size, compressed_size = struct.unpack(
+                            "<II", tmp[4:12]
+                        )
+                        last_uncompressed = lz4.block.decompress(
+                            tmp[12 : 12 + compressed_size],
+                            uncompressed_size,
+                            dict=last_uncompressed,
+                        )
+                        tmp = tmp[12 + compressed_size :]
+                        decompress_bytes += last_uncompressed
+                    ret = decompress_bytes
                 writer.WriteInt32(len(ret))
                 ns.sendall(ret)
             else:
@@ -1001,6 +1021,7 @@ def ceserver(pid, api, symbol_api, config, session):
     global NATIVE_CESERVER_IP
     global CUSTOM_SYMBOL_LOADER
     global DEBUGSERVER_IP
+    global CUSTOM_READ_MEMORY
 
     PID = pid
     API = api
@@ -1014,6 +1035,7 @@ def ceserver(pid, api, symbol_api, config, session):
     NATIVE_CESERVER_IP = config["ipconfig"]["native_ceserver_ip"]
     CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
     DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
+    CUSTOM_READ_MEMORY = config["extended_function"]["custom_read_memory"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

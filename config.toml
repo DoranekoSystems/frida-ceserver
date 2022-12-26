@@ -12,7 +12,7 @@ ceversion =  "7.4.3"
 frida_server_ip =  ""
 native_ceserver_ip =  ""
 debugserver_ip =  ""
-  
+ 
 [ssh_auto]
 enable = false
 ip = ""
@@ -28,6 +28,7 @@ ceserver_path = ""
 gdbserver_path = ""
 
 [extended_function]
+custom_read_memory = false
 fix_module_size =  false
 manualParser = false
 javaDissect  = false

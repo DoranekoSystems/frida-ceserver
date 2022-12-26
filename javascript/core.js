@@ -229,12 +229,86 @@ function getRealFileSize(filename) {
   return size;
 }
 
+const COMPRESSION_LZ4 = 0x100;
+const COMPRESSION_LZ4_RAW = 0x101;
+const COMPRESSION_ZLIB = 0x205;
+const COMPRESSION_LZMA = 0x306;
+const COMPRESSION_LZFSE = 0x801;
+const COMPRESSION_BROTLI = 0xb02;
+
+var mach_task_self;
+var mach_vm_read_overwrite;
+var compression_encode_buffer;
+
+var g_Buffer;
+var g_dstBuffer;
+var g_Task;
+var g_Mutex = true;
+
+function ReadProcessMemory_Init() {
+  var mach_task_selfPtr = Module.findExportByName(null, 'mach_task_self');
+  var mach_vm_read_overwritePtr = Module.findExportByName(null, 'mach_vm_read_overwrite');
+
+  mach_task_self = new NativeFunction(mach_task_selfPtr, 'pointer', []);
+  mach_vm_read_overwrite = new NativeFunction(mach_vm_read_overwritePtr, 'int', [
+    'pointer',
+    'long',
+    'int',
+    'pointer',
+    'pointer',
+  ]);
+  g_Buffer = Memory.alloc(1048576);
+  g_dstBuffer = Memory.alloc(1048576);
+  g_Task = mach_task_self();
+
+  var compression_encode_bufferPtr = Module.findExportByName(null, 'compression_encode_buffer');
+  compression_encode_buffer = new NativeFunction(compression_encode_bufferPtr, 'int', [
+    'pointer',
+    'int',
+    'pointer',
+    'int',
+    'pointer',
+    'int',
+  ]);
+}
+
+function ReadProcessMemory_Custom(address, size) {
+  while (!g_Mutex) {
+    Thread.sleep(0.00001);
+  }
+  g_Mutex = false;
+  var size_out = Memory.alloc(8);
+  mach_vm_read_overwrite(g_Task, address, size, g_Buffer, size_out);
+  if (size_out.readUInt() == 0) {
+    g_Mutex = true;
+    return false;
+  } else {
+    var compress_size = compression_encode_buffer(
+      g_dstBuffer,
+      size,
+      g_Buffer,
+      size,
+      ptr(0),
+      COMPRESSION_LZ4
+    );
+    var ret = ArrayBuffer.wrap(g_dstBuffer, compress_size);
+    g_Mutex = true;
+    return ret;
+  }
+}
+
+var custom_read_memory = false;
 var fix_module_size = false;
 var java_dissect = false;
 rpc.exports = {
   setconfig: function (config) {
-    fix_module_size = config['fix_module_size'];
-    java_dissect = config['javaDissect'];
+    custom_read_memory = config['extended_function']['custom_read_memory'];
+    fix_module_size = config['extended_function']['fix_module_size'];
+    java_dissect = config['extended_function']['javaDissect'];
+    if (custom_read_memory && Process.platform == 'darwin') {
+      ReadProcessMemory_Init();
+      console.log('ReadProcessMemory_Custom Enabled!!');
+    }
   },
   getinfo: function () {
     var pid = Process.id;
@@ -244,7 +318,12 @@ rpc.exports = {
   readprocessmemory: function (address, size) {
     try {
       if (ptr(address).isNull() == false) {
-        return Memory.readByteArray(ptr(address), size);
+        if (custom_read_memory && Process.platform == 'darwin') {
+          var ret = ReadProcessMemory_Custom(address, size);
+        } else {
+          var ret = Memory.readByteArray(ptr(address), size);
+        }
+        return ret;
       } else {
         return false;
       }

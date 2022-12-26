@@ -1,3 +1,4 @@
 packaging
 paramiko
 toml
+lz4
