@@ -621,6 +621,7 @@ def handler(ns, nc, command, thread_count):
             ret = API.ReadProcessMemory(address, size)
         if compress == 0:
             if ret != False:
+                # iOS
                 if CUSTOM_READ_MEMORY and TARGETOS == OS.IOS.value:
                     decompress_bytes = b""
                     tmp = ret
@@ -639,6 +640,11 @@ def handler(ns, nc, command, thread_count):
                         )
                         tmp = tmp[12 + compressed_size :]
                         decompress_bytes += last_uncompressed
+                    ret = decompress_bytes
+                # Android
+                elif CUSTOM_READ_MEMORY and TARGETOS == OS.ANDROID.value:
+                    uncompressed_size = struct.unpack("<I", ret[-4:])[0]
+                    decompress_bytes = lz4.block.decompress(ret[:-4], uncompressed_size)
                     ret = decompress_bytes
                 writer.WriteInt32(len(ret))
                 ns.sendall(ret)

@@ -240,71 +240,136 @@ var mach_task_self;
 var mach_vm_read_overwrite;
 var compression_encode_buffer;
 
+var process_vm_readv;
+var process_vm_writev;
+var LZ4_compress_default;
+var LZ4_compress_fast;
+
 var g_Buffer;
 var g_dstBuffer;
 var g_Task;
 var g_Mutex = true;
 
+//Up to 10 threads can be handled simultaneously
+g_Buffer = Memory.alloc(1048576 * 10);
+g_dstBuffer = Memory.alloc(1048576 * 10);
+
 function ReadProcessMemory_Init() {
-  var mach_task_selfPtr = Module.findExportByName(null, 'mach_task_self');
-  var mach_vm_read_overwritePtr = Module.findExportByName(null, 'mach_vm_read_overwrite');
+  //iOS
+  if (target_os == 'ios') {
+    var mach_task_selfPtr = Module.findExportByName(null, 'mach_task_self');
+    var mach_vm_read_overwritePtr = Module.findExportByName(null, 'mach_vm_read_overwrite');
 
-  mach_task_self = new NativeFunction(mach_task_selfPtr, 'pointer', []);
-  mach_vm_read_overwrite = new NativeFunction(mach_vm_read_overwritePtr, 'int', [
-    'pointer',
-    'long',
-    'int',
-    'pointer',
-    'pointer',
-  ]);
+    mach_task_self = new NativeFunction(mach_task_selfPtr, 'pointer', []);
+    mach_vm_read_overwrite = new NativeFunction(mach_vm_read_overwritePtr, 'int', [
+      'pointer',
+      'long',
+      'int',
+      'pointer',
+      'pointer',
+    ]);
 
-  //Up to 10 threads can be handled simultaneously
-  g_Buffer = Memory.alloc(1048576 * 10);
-  g_dstBuffer = Memory.alloc(1048576 * 10);
-  g_Task = mach_task_self();
+    var compression_encode_bufferPtr = Module.findExportByName(null, 'compression_encode_buffer');
+    compression_encode_buffer = new NativeFunction(compression_encode_bufferPtr, 'int', [
+      'pointer',
+      'int',
+      'pointer',
+      'int',
+      'pointer',
+      'int',
+    ]);
+    g_Task = mach_task_self();
+  }
+  //Android
+  else {
+    Module.load('liblz4.so');
 
-  var compression_encode_bufferPtr = Module.findExportByName(null, 'compression_encode_buffer');
-  compression_encode_buffer = new NativeFunction(compression_encode_bufferPtr, 'int', [
-    'pointer',
-    'int',
-    'pointer',
-    'int',
-    'pointer',
-    'int',
-  ]);
+    var LZ4_compress_defaultPtr = Module.findExportByName('liblz4.so', 'LZ4_compress_default');
+    LZ4_compress_default = new NativeFunction(LZ4_compress_defaultPtr, 'int', [
+      'pointer',
+      'pointer',
+      'int',
+      'int',
+    ]);
+    var LZ4_compress_fastPtr = Module.findExportByName('liblz4.so', 'LZ4_compress_default');
+    LZ4_compress_fast = new NativeFunction(LZ4_compress_fastPtr, 'int', [
+      'pointer',
+      'pointer',
+      'int',
+      'int',
+      'int',
+    ]);
+    var process_vm_readvPtr = Module.findExportByName(null, 'process_vm_readv');
+    process_vm_readv = new NativeFunction(process_vm_readvPtr, 'int', [
+      'int',
+      'pointer',
+      'int',
+      'pointer',
+      'int',
+      'int',
+    ]);
+  }
 }
 
 var loop_count = 0;
 function ReadProcessMemory_Custom(address, size) {
   loop_count++;
   var start_offset = (loop_count % 10) * 1048576;
-  var size_out = Memory.alloc(8);
-  mach_vm_read_overwrite(g_Task, address, size, g_Buffer.add(start_offset), size_out);
-  if (size_out.readUInt() == 0) {
-    return false;
-  } else {
-    var compress_size = compression_encode_buffer(
-      g_dstBuffer.add(start_offset),
-      size,
-      g_Buffer.add(start_offset),
-      size,
-      ptr(0),
-      COMPRESSION_LZ4
-    );
-    var ret = ArrayBuffer.wrap(g_dstBuffer.add(start_offset), compress_size);
-    return ret;
+  //iOS
+  if (Process.platform == 'darwin') {
+    var size_out = Memory.alloc(8);
+    mach_vm_read_overwrite(g_Task, address, size, g_Buffer.add(start_offset), size_out);
+    if (size_out.readUInt() == 0) {
+      return false;
+    } else {
+      var compress_size = compression_encode_buffer(
+        g_dstBuffer.add(start_offset),
+        size,
+        g_Buffer.add(start_offset),
+        size,
+        ptr(0),
+        COMPRESSION_LZ4
+      );
+      var ret = ArrayBuffer.wrap(g_dstBuffer.add(start_offset), compress_size);
+      return ret;
+    }
+  }
+  //Android
+  else {
+    var local = Memory.alloc(32);
+    var remote = Memory.alloc(32);
+    local.writePointer(g_Buffer.add(start_offset));
+    local.add(PS).writeUInt(size);
+    remote.writePointer(ptr(address));
+    remote.add(PS).writeUInt(size);
+    var size_out = process_vm_readv(Process.id, local, 1, remote, 1, 0);
+    if (size_out == -1) {
+      return false;
+    } else {
+      var compress_size = LZ4_compress_default(
+        g_Buffer.add(start_offset),
+        g_dstBuffer.add(start_offset),
+        size_out,
+        size_out
+      );
+      var ret = ArrayBuffer.wrap(g_dstBuffer.add(start_offset), compress_size + 4);
+      g_dstBuffer.add(start_offset + compress_size).writeUInt(size_out);
+      return ret;
+    }
   }
 }
 
 var custom_read_memory = false;
 var fix_module_size = false;
 var java_dissect = false;
+var target_os = '';
 rpc.exports = {
   setconfig: function (config) {
     custom_read_memory = config['extended_function']['custom_read_memory'];
     fix_module_size = config['extended_function']['fix_module_size'];
     java_dissect = config['extended_function']['javaDissect'];
-    if (custom_read_memory && Process.platform == 'darwin') {
+    target_os = config['general']['targetOS'];
+    if (custom_read_memory && ['android', 'ios'].indexOf(target_os != -1)) {
       ReadProcessMemory_Init();
       console.log('ReadProcessMemory_Custom Enabled!!');
     }
@@ -317,7 +382,7 @@ rpc.exports = {
   readprocessmemory: function (address, size) {
     try {
       if (ptr(address).isNull() == false) {
-        if (custom_read_memory && Process.platform == 'darwin') {
+        if (custom_read_memory && ['android', 'ios'].indexOf(target_os) != -1) {
           var ret = ReadProcessMemory_Custom(address, size);
         } else {
           var ret = Memory.readByteArray(ptr(address), size);
