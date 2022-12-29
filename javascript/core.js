@@ -243,6 +243,7 @@ var compression_encode_buffer;
 var process_vm_readv;
 var process_vm_writev;
 var LZ4_compress_default;
+var LZ4_compressBound;
 var LZ4_compress_fast;
 
 var g_Buffer;
@@ -251,8 +252,9 @@ var g_Task;
 var g_Mutex = true;
 
 //Up to 10 threads can be handled simultaneously
-g_Buffer = Memory.alloc(1048576 * 10);
-g_dstBuffer = Memory.alloc(1048576 * 10);
+var g_maxThread = 10;
+g_Buffer = Memory.alloc(1048576 * g_maxThread);
+g_dstBuffer = Memory.alloc(1048576 * g_maxThread);
 
 function ReadProcessMemory_Init() {
   //iOS
@@ -299,6 +301,8 @@ function ReadProcessMemory_Init() {
       'int',
       'int',
     ]);
+    var LZ4_compressBoundPtr = Module.findExportByName('liblz4.so', 'LZ4_compressBound');
+    LZ4_compressBound = new NativeFunction(LZ4_compressBoundPtr, 'int', ['int']);
     var process_vm_readvPtr = Module.findExportByName(null, 'process_vm_readv');
     process_vm_readv = new NativeFunction(process_vm_readvPtr, 'int', [
       'int',
@@ -314,7 +318,7 @@ function ReadProcessMemory_Init() {
 var loop_count = 0;
 function ReadProcessMemory_Custom(address, size) {
   loop_count++;
-  var start_offset = (loop_count % 10) * 1048576;
+  var start_offset = (loop_count % g_maxThread) * 1048576;
   //iOS
   if (Process.platform == 'darwin') {
     var size_out = Memory.alloc(8);
@@ -346,11 +350,12 @@ function ReadProcessMemory_Custom(address, size) {
     if (size_out == -1) {
       return false;
     } else {
+      var dstCapacity = LZ4_compressBound(size_out);
       var compress_size = LZ4_compress_default(
         g_Buffer.add(start_offset),
         g_dstBuffer.add(start_offset),
         size_out,
-        size_out
+        dstCapacity
       );
       var ret = ArrayBuffer.wrap(g_dstBuffer.add(start_offset), compress_size + 4);
       g_dstBuffer.add(start_offset + compress_size).writeUInt(size_out);
