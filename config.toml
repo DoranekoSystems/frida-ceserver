@@ -33,3 +33,4 @@ fix_module_size =  false
 manualParser = false
 javaDissect  = false
 custom_symbol_loader =  ""
+data_collector = ""

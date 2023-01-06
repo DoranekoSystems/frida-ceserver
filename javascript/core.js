@@ -367,12 +367,14 @@ function ReadProcessMemory_Custom(address, size) {
 var custom_read_memory = false;
 var fix_module_size = false;
 var java_dissect = false;
+var data_collector = '';
 var target_os = '';
 rpc.exports = {
   setconfig: function (config) {
     custom_read_memory = config['extended_function']['custom_read_memory'];
     fix_module_size = config['extended_function']['fix_module_size'];
     java_dissect = config['extended_function']['javaDissect'];
+    data_collector = config['extended_function']['data_collector'];
     target_os = config['general']['targetOS'];
     if (custom_read_memory && ['android', 'ios'].indexOf(target_os != -1)) {
       ReadProcessMemory_Init();
@@ -418,6 +420,13 @@ rpc.exports = {
     if (java_dissect) {
       moduleList.push({ base: '0xcececece', size: 0, name: 'jvm.dll' });
       moduleList.push({ base: '0xecececec', size: 0, name: 'CEJVMTI.dll' });
+    }
+    if (data_collector == 'mono' || data_collector == 'objc') {
+      moduleList.push({
+        base: '0xcececece',
+        size: 0x40000,
+        name: 'libmono-datacollector-dummy.so',
+      });
     }
     moduleListIterator = 0;
     moduleSize = Object.keys(moduleList).length;

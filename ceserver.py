@@ -9,6 +9,7 @@ from enum import IntEnum, auto
 import threading
 import random
 from packaging.version import Version, parse
+import mono_pipeserver
 from define import OS
 from lldbauto import *
 import lz4.block
@@ -26,6 +27,7 @@ NATIVE_CESERVER_IP = 0
 CUSTOM_SYMBOL_LOADER = []
 DEBUGSERVER_IP = 0
 CUSTOM_READ_MEMORY = 0
+DATA_COLLECTOR = 0
 
 LLDB = 0
 DEBUG_EVENT = []
@@ -166,6 +168,12 @@ class BinaryReader:
     def ReadUInt64(self):
         result = recvall(self.base, 8)
         ret = unpack("<Q", result)[0]
+        return ret
+
+    def ReadString16(self):
+        l = self.ReadUInt16()
+        result = recvall(self.base, l)
+        ret = result.decode()
         return ret
 
 
@@ -463,9 +471,8 @@ def handler(ns, nc, command, thread_count):
         pid = reader.ReadInt32()
         bytecode = b""
         if dwFlags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
-            API.Module32First()
+            ret = API.Module32First()
             while True:
-                ret = API.Module32Next()
                 if ret != False:
                     modulename = ret[2].encode()
                     modulenamesize = len(modulename)
@@ -484,6 +491,7 @@ def handler(ns, nc, command, thread_count):
                     bytecode = b"".join([bytecode, tmp])
                 else:
                     break
+                ret = API.Module32Next()
             tmp = pack("<iQIII", 0, 0, 0, 0, 0)
             bytecode = b"".join([bytecode, tmp])
             ns.sendall(bytecode)
@@ -808,8 +816,11 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         modulepathlength = reader.ReadInt32()
         modulepath = ns.recv(modulepathlength).decode()
-        r = API.ExtLoadModule(modulepath)
-        writer.WriteInt32(r)
+        if modulepath.find("libMonoDataCollector") != -1:
+            writer.WriteUInt64(0x7FFFDEADBEAF)
+        else:
+            r = API.ExtLoadModule(modulepath)
+            writer.WriteUInt64(r)
 
     elif command == CECMD.CMD_CREATETHREAD:
         handle = reader.ReadInt32()
@@ -988,6 +999,38 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_GETOPTIONS:
         writer.WriteInt16(0)
 
+    elif command == CECMD.CMD_OPENNAMEDPIPE:
+        pipename = reader.ReadString16()
+        timeout = reader.ReadUInt32()
+        pipehandle = random.randint(1, 0x10000)
+        writer.WriteInt32(pipehandle)
+
+    elif command == CECMD.CMD_PIPEREAD:
+        pipehandle = reader.ReadUInt32()
+        size = reader.ReadUInt32()
+        timeout = reader.ReadUInt32()
+
+        mono_writer = mono_pipeserver.WRITER
+        ret = mono_writer.ReadMessage(size)
+        writer.WriteUInt32(len(ret))
+        ns.sendall(ret)
+
+    elif command == CECMD.CMD_PIPEWRITE:
+        pipehandle = reader.ReadUInt32()
+        size = reader.ReadUInt32()
+        timeout = reader.ReadUInt32()
+        buf = ns.recv(size)
+
+        mono_pipeserver.mono_process(buf)
+        writer.WriteUInt32(size)
+
+    elif command == CECMD.CMD_ISANDROID:
+        writer.WriteInt8(1)
+
+    elif command == CECMD.CMD_GETCESERVERPATH:
+        path = b"/data/local/tmp/ceserver"
+        writer.WriteInt16(len(path))
+        ns.sendall(path)
     else:
         pass
     return 1
@@ -1028,6 +1071,7 @@ def ceserver(pid, api, symbol_api, config, session):
     global CUSTOM_SYMBOL_LOADER
     global DEBUGSERVER_IP
     global CUSTOM_READ_MEMORY
+    global DATA_COLLECTOR
 
     PID = pid
     API = api
@@ -1042,6 +1086,9 @@ def ceserver(pid, api, symbol_api, config, session):
     CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
     DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
     CUSTOM_READ_MEMORY = config["extended_function"]["custom_read_memory"]
+    DATA_COLLECTOR = config["extended_function"]["data_collector"]
+    if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
+        mono_pipeserver.mono_init(session,DATA_COLLECTOR)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
