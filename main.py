@@ -10,29 +10,6 @@ from automation import *
 with open("config.toml") as f:
     config = toml.loads(f.read())
 
-
-def get_device():
-    mgr = frida.get_device_manager()
-    changed = threading.Event()
-
-    def on_changed():
-        changed.set()
-
-    mgr.on("changed", on_changed)
-
-    device = None
-    while device is None:
-        devices = [dev for dev in mgr.enumerate_devices() if dev.type == "usb"]
-        if len(devices) == 0:
-            print("Waiting for usb device...")
-            changed.wait()
-        else:
-            device = devices[0]
-
-    mgr.off("changed", on_changed)
-    return device
-
-
 def main(package, pid=None):
     targetOS = config["general"]["targetOS"]
     mode = config["general"]["mode"]
@@ -69,7 +46,7 @@ def main(package, pid=None):
         if frida_server_ip != "":
             device = frida.get_device_manager().add_remote_device(frida_server_ip)
         else:
-            device = get_device()
+            device = frida.get_usb_device()
         if pid == None:
             apps = device.enumerate_applications()
             target = package
@@ -124,14 +101,14 @@ def main(package, pid=None):
     script = session.create_script(jscode)
     script.on("message", on_message)
     script.load()
-    api = script.exports
+    api = script.exports_sync
     api.SetConfig(config)
     symbol_api = 0
     if targetOS != OS.WINDOWS.value:
         script2 = session.create_script(jscode2)
         script2.on("message", on_message)
         script2.load()
-        symbol_api = script2.exports
+        symbol_api = script2.exports_sync
     if mode == MODE.ATTACH.value:
         info = api.GetInfo()
         process_id = info["pid"]

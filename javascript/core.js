@@ -516,13 +516,21 @@ rpc.exports = {
     } catch (e) {
       return false;
     }
-    var symbols = module.enumerateSymbols();
+    var symbols;
+    if (Process.platform == 'linux') {
+      symbols = module.enumerateSymbols();
+    } else {
+      symbols = module.enumerateExports();
+    }
     var symbollist = [];
     for (var i = 0; i < symbols.length; i++) {
       var baseaddress = symbols[i].address;
       if (baseaddress <= 0) continue;
       baseaddress = baseaddress - module.base;
       var size = symbols[i].size;
+      if (size == null) {
+        size = 1;
+      }
       var type = symbols[i].type;
       var name = symbols[i].name;
       //for speedhack

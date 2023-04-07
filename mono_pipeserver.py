@@ -350,6 +350,6 @@ def mono_init(session, data_collector):
     script = session.create_script(jscode)
     script.on("message", on_message)
     script.load()
-    api = script.exports
+    api = script.exports_sync
     API = api
     SCRIPT = script
