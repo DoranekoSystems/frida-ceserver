@@ -9,6 +9,7 @@ from enum import IntEnum, auto
 import threading
 import random
 from packaging.version import Version, parse
+import importlib.util
 import mono_pipeserver
 from define import OS
 from lldbauto import *
@@ -428,15 +429,22 @@ def debugger_thread():
 script_dict = {}
 
 
-def load_frida_script(jscode, numberStr):
+def load_frida_script(jscode, numberStr, filename=""):
     global script_dict
     session = SESSION
     script = session.create_script(jscode)
 
-    def on_message(message, data):
-        print(message)
+    if filename != "":
+        spec = importlib.util.spec_from_file_location("callback", filename)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        script.on("message", module.on_message)
+    else:
 
-    script.on("message", on_message)
+        def on_message(message, data):
+            print(message)
+
+        script.on("message", on_message)
     script.load()
     script_dict[numberStr] = script
 
@@ -682,7 +690,14 @@ def handler(ns, nc, command, thread_count):
             # Addresses 0 to 100 will interpret the written content as frida javascript code and execute the script.
             if 0 <= address <= 100:
                 if _buf.find("UNLOAD".encode()) != 0:
-                    load_frida_script(_buf.decode(), str(address))
+                    message = _buf.decode()
+                    jscode = "?".join(message.split("?")[:-1])
+                    pyfilename = message.split("?")[-1]
+                    if pyfilename != "":
+                        filename = os.path.join("callback", pyfilename)
+                    else:
+                        filename = ""
+                    load_frida_script(jscode, str(address), filename)
                 else:
                     if str(address) in script_dict:
                         unload_frida_script(str(address))
@@ -1088,7 +1103,7 @@ def ceserver(pid, api, symbol_api, config, session):
     CUSTOM_READ_MEMORY = config["extended_function"]["custom_read_memory"]
     DATA_COLLECTOR = config["extended_function"]["data_collector"]
     if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
-        mono_pipeserver.mono_init(session,DATA_COLLECTOR)
+        mono_pipeserver.mono_init(session, DATA_COLLECTOR)
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
