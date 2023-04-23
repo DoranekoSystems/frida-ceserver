@@ -3,3 +3,5 @@ pywin32
 paramiko
 toml
 lz4
+windows-curses
+colorama

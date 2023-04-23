@@ -8,6 +8,8 @@ import json
 from enum import IntEnum, auto
 import threading
 import random
+import platform
+import subprocess
 from packaging.version import Version, parse
 import importlib.util
 import mono_pipeserver
@@ -17,6 +19,7 @@ import lz4.block
 
 PID = 0
 API = 0
+EXTEND_API = 0
 SYMBOL_API = 0
 ARCH = 0
 SESSION = 0
@@ -703,7 +706,38 @@ def handler(ns, nc, command, thread_count):
                         unload_frida_script(str(address))
                 ret = True
             else:
-                ret = API.WriteProcessMemory(address, list(_buf))
+                # Address == 0xFFFFFFFFFFFFFFFF => ExtendCommand
+                if address == 0xFFFFFFFFFFFFFFFF:
+                    message = _buf.decode()
+                    jdict = json.loads(message)
+                    command = jdict["command"]
+                    if command == "HexEditor":
+                        watch_address = int(jdict["address"], 16)
+
+                        def run():
+                            hostos = platform.system()
+                            if hostos == "Darwin":
+                                from applescript import tell
+
+                                cwd = os.getcwd()
+                                pycmd = f"python3 main.py -p {PID} --memoryview {hex(watch_address)}"
+                                tell.app(
+                                    "Terminal",
+                                    'do script "' + f"cd {cwd};{pycmd}" + '"',
+                                )
+                            elif hostos == "Windows":
+                                subprocess.call(
+                                    f"python main.py -p {PID} --memoryview {hex(watch_address)}",
+                                    creationflags=subprocess.CREATE_NEW_CONSOLE,
+                                )
+                            else:
+                                print("Not Support")
+
+                        t1 = threading.Thread(target=run)
+                        t1.start()
+                    ret = True
+                else:
+                    ret = API.WriteProcessMemory(address, list(_buf))
             if ret != False:
                 writer.WriteInt32(size)
             else:
@@ -1048,6 +1082,7 @@ def handler(ns, nc, command, thread_count):
         ns.sendall(path)
     else:
         pass
+    # print("END")
     return 1
 
 
@@ -1075,6 +1110,7 @@ def main_thread(conn, native_client, thread_count):
 def ceserver(pid, api, symbol_api, config, session):
     global PID
     global API
+    global EXTEND_API
     global SYMBOL_API
     global ARCH
     global SESSION

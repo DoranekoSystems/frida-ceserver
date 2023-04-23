@@ -7,8 +7,12 @@ import toml
 from define import OS, MODE
 from automation import *
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/memoryview")
+from hexview import memory_view_mode
+
 with open("config.toml") as f:
     config = toml.loads(f.read())
+
 
 def get_device():
     mgr = frida.get_device_manager()
@@ -31,7 +35,8 @@ def get_device():
     mgr.off("changed", on_changed)
     return device
 
-def main(package, pid=None):
+
+def main(package, pid=None, run_mode=None, memory_address=None):
     targetOS = config["general"]["targetOS"]
     mode = config["general"]["mode"]
     javaDissect = config["extended_function"]["javaDissect"]
@@ -39,29 +44,30 @@ def main(package, pid=None):
     binary_path = config["general"]["binary_path"]
 
     adb_auto = config["adb_auto"]
-    if adb_auto["enable"] and targetOS == OS.ANDROID.value:
-        adbauto = ADBAutomation(adb_auto)
-        if adb_auto["ceserver_path"] != "":
-            t1 = threading.Thread(target=adbauto.exec_ceserver)
-            t1.start()
-        if adb_auto["frida_server_path"] != "":
-            t2 = threading.Thread(target=adbauto.exec_frida_server)
-            t2.start()
-        if adb_auto["gdbserver_path"] != "":
-            t3 = threading.Thread(target=adbauto.exec_gdbserver)
-            t3.start()
-        time.sleep(1)
+    if run_mode != "memoryview":
+        if adb_auto["enable"] and targetOS == OS.ANDROID.value:
+            adbauto = ADBAutomation(adb_auto)
+            if adb_auto["ceserver_path"] != "":
+                t1 = threading.Thread(target=adbauto.exec_ceserver)
+                t1.start()
+            if adb_auto["frida_server_path"] != "":
+                t2 = threading.Thread(target=adbauto.exec_frida_server)
+                t2.start()
+            if adb_auto["gdbserver_path"] != "":
+                t3 = threading.Thread(target=adbauto.exec_gdbserver)
+                t3.start()
+            time.sleep(1)
 
-    ssh_auto = config["ssh_auto"]
-    if ssh_auto["enable"] and targetOS == OS.IOS.value:
-        sshauto = SSHAutomation(ssh_auto)
-        if ssh_auto["ceserver_path"] != "":
-            t1 = threading.Thread(target=sshauto.exec_ceserver)
-            t1.start()
-        if ssh_auto["debugserver_path"] != "":
-            t2 = threading.Thread(target=sshauto.exec_debugserver)
-            t2.start()
-        time.sleep(1)
+        ssh_auto = config["ssh_auto"]
+        if ssh_auto["enable"] and targetOS == OS.IOS.value:
+            sshauto = SSHAutomation(ssh_auto)
+            if ssh_auto["ceserver_path"] != "":
+                t1 = threading.Thread(target=sshauto.exec_ceserver)
+                t1.start()
+            if ssh_auto["debugserver_path"] != "":
+                t2 = threading.Thread(target=sshauto.exec_debugserver)
+                t2.start()
+            time.sleep(1)
 
     if targetOS in [OS.ANDROID.value, OS.IOS.value]:
         if frida_server_ip != "":
@@ -124,6 +130,9 @@ def main(package, pid=None):
     script.load()
     api = script.exports_sync
     api.SetConfig(config)
+    if run_mode == "memoryview":
+        memory_view_mode(api, memory_address)
+        return
     symbol_api = 0
     if targetOS != OS.WINDOWS.value:
         script2 = session.create_script(jscode2)
@@ -154,24 +163,30 @@ if __name__ == "__main__":
     target = config["general"]["target"]
     targetOS = config["general"]["targetOS"]
     binary_path = config["general"]["binary_path"]
-    if targetOS in [OS.ANDROID.value, OS.IOS.value]:
-        if target == "":
-            if args[1] == "-p" or args[1] == "--pid":
-                pid = int(args[2])
-                main(None, pid)
-            else:
-                main(args[1])
-        else:
-            main(target)
+    if "--memoryview" in args:
+        memory_address = int(args[args.index("--memoryview") + 1], 16)
+        run_mode = "memoryview"
+        pid = int(args[2])
+        main(None, pid, run_mode, memory_address)
     else:
-        if target == "":
-            if binary_path == "":
+        if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+            if target == "":
                 if args[1] == "-p" or args[1] == "--pid":
                     pid = int(args[2])
                     main(None, pid)
                 else:
                     main(args[1])
             else:
-                main("")
+                main(target)
         else:
-            main(target)
+            if target == "":
+                if binary_path == "":
+                    if args[1] == "-p" or args[1] == "--pid":
+                        pid = int(args[2])
+                        main(None, pid)
+                    else:
+                        main(args[1])
+                else:
+                    main("")
+            else:
+                main(target)

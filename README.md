@@ -1,12 +1,13 @@
 # frida-ceserver
 
-frida based ceserver.Fusion of cheat engine and frida.  
+frida based ceserver.Fusion of cheat engine and frida.
 
 Original by Dark Byte.
 
 # Support Platforms
 
 ## Host OS
+
 - Windows
 - Mac(Newer than CE 7.4.2)
 
@@ -74,6 +75,8 @@ The debugger is currently under development!
 
 # Credits
 
+## frida-elf
+
 iGio90:[frida-elf](https://github.com/iGio90/frida-elf)
 
 ```
@@ -97,3 +100,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## hexview
+
+The original software is available at  
+https://github.com/walterdejong/hexview.  
+This project is a partial enhancement of the above great software.
