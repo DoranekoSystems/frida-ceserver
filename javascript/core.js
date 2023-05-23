@@ -251,10 +251,11 @@ var g_dstBuffer;
 var g_Task;
 var g_Mutex = true;
 
-//Up to 10 threads can be handled simultaneously
-var g_maxThread = 10;
-g_Buffer = Memory.alloc(1048576 * g_maxThread);
-g_dstBuffer = Memory.alloc(1048576 * g_maxThread);
+//Up to 1 threads can be handled simultaneously
+const g_bufferSize = 16384 * 1024;
+const g_maxThread = 1;
+g_Buffer = Memory.alloc(g_bufferSize * g_maxThread);
+g_dstBuffer = Memory.alloc(g_bufferSize * g_maxThread);
 
 function ReadProcessMemory_Init() {
   //iOS
@@ -293,7 +294,7 @@ function ReadProcessMemory_Init() {
       'int',
       'int',
     ]);
-    var LZ4_compress_fastPtr = Module.findExportByName('liblz4.so', 'LZ4_compress_default');
+    var LZ4_compress_fastPtr = Module.findExportByName('liblz4.so', 'LZ4_compress_fast');
     LZ4_compress_fast = new NativeFunction(LZ4_compress_fastPtr, 'int', [
       'pointer',
       'pointer',
@@ -318,7 +319,7 @@ function ReadProcessMemory_Init() {
 var loop_count = 0;
 function ReadProcessMemory_Custom(address, size) {
   loop_count++;
-  var start_offset = (loop_count % g_maxThread) * 1048576;
+  var start_offset = (loop_count % g_maxThread) * g_bufferSize;
   //iOS
   if (Process.platform == 'darwin') {
     var size_out = Memory.alloc(8);

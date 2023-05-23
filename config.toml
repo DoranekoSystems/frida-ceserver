@@ -6,7 +6,8 @@ mode =  "attach"
 binary_path = ""
 # 0:i386 1:x86_64 2:arm 3:aarch64
 arch = 3
-ceversion =  "7.4.5"
+ceversion =  "7.5"
+listen_port = 52736
 
 [ipconfig]
 frida_server_ip =  ""

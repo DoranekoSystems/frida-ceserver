@@ -470,7 +470,7 @@ def handler(ns, nc, command, thread_count):
     reader2 = BinaryReader(nc)
     writer2 = BinaryWriter(nc)
 
-    # print(str(thread_count) + ":" + str(CECMD(command)))
+    # print(str(thread_count) + ":" + str(CECMD(command).name))
     if command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT:
         dwFlags = reader.ReadInt32()
         pid = reader.ReadInt32()
@@ -490,20 +490,35 @@ def handler(ns, nc, command, thread_count):
                     modulebase = int(ret[0], 16)
                     modulepart = 0
                     modulesize = ret[1]
-                    tmp = pack(
-                        "<iQIII" + str(modulenamesize) + "s",
-                        1,
-                        modulebase,
-                        modulepart,
-                        modulesize,
-                        modulenamesize,
-                        modulename,
-                    )
+                    if parse(CEVERSION) >= parse("7.6"):
+                        tmp = pack(
+                            "<iQIIII" + str(modulenamesize) + "s",
+                            1,
+                            modulebase,
+                            modulepart,
+                            modulesize,
+                            0,
+                            modulenamesize,
+                            modulename,
+                        )
+                    else:
+                        tmp = pack(
+                            "<iQIII" + str(modulenamesize) + "s",
+                            1,
+                            modulebase,
+                            modulepart,
+                            modulesize,
+                            modulenamesize,
+                            modulename,
+                        )
                     bytecode = b"".join([bytecode, tmp])
                 else:
                     break
                 ret = API.Module32Next()
-            tmp = pack("<iQIII", 0, 0, 0, 0, 0)
+            if parse(CEVERSION) >= parse("7.6"):
+                tmp = pack("<iQIIII", 0, 0, 0, 0, 0, 0)
+            else:
+                tmp = pack("<iQIII", 0, 0, 0, 0, 0)
             bytecode = b"".join([bytecode, tmp])
             ns.sendall(bytecode)
         elif dwFlags & TH32CS_SNAPTHREAD == TH32CS_SNAPTHREAD:
@@ -550,7 +565,18 @@ def handler(ns, nc, command, thread_count):
             modulebase = int(ret[0], 16)
             modulepart = 0
             modulesize = ret[1]
-            if parse(CEVERSION) >= parse("7.3.1"):
+            if parse(CEVERSION) >= parse("7.6"):
+                bytecode = pack(
+                    "<iQIIII" + str(modulenamesize) + "s",
+                    1,
+                    modulebase,
+                    modulepart,
+                    modulesize,
+                    0,
+                    modulenamesize,
+                    modulename,
+                )
+            elif parse(CEVERSION) >= parse("7.3.1"):
                 bytecode = pack(
                     "<iQIII" + str(modulenamesize) + "s",
                     1,
@@ -811,7 +837,10 @@ def handler(ns, nc, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.4.3"):
+        if parse(CEVERSION) >= parse("7.6"):
+            version = 6
+            versionstring = "CHEATENGINE Network 2.3".encode()
+        elif parse(CEVERSION) >= parse("7.4.3"):
             version = 5
             versionstring = "CHEATENGINE Network 2.2".encode()
         elif parse(CEVERSION) >= parse("7.4.2"):
@@ -1140,11 +1169,12 @@ def ceserver(pid, api, symbol_api, config, session):
     DATA_COLLECTOR = config["extended_function"]["data_collector"]
     if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
         mono_pipeserver.mono_init(session, DATA_COLLECTOR)
+    listen_port = config["general"]["listen_port"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         thread_count = 0
-        s.bind(("127.0.0.1", 52736))
+        s.bind(("127.0.0.1", listen_port))
         s.listen(32)
         lock = threading.Lock()
         while True:
