@@ -6,6 +6,27 @@ import time
 import threading
 import struct
 import paramiko
+import subprocess
+from applescript import tell
+
+
+def open_terminal(command):
+    if os.name == "nt":  # For Windows
+        subprocess.Popen(f'start cmd /k "{command}"', shell=True)
+    elif sys.platform == "darwin":  # For MacOS
+        cwd = os.getcwd()
+        tell.app(
+            "Terminal",
+            'do script "' + f"cd {cwd};{command}" + '"',
+        )
+    else:  # For Linux/Unix
+        try:
+            subprocess.Popen(f'gnome-terminal "{command}"', shell=True)
+        except OSError:
+            print(
+                "Couldn't open a new terminal window. Try installing gnome-terminal or use another method."
+            )
+        # Note: For other terminal you might need to adjust the above command ('gnome-terminal', 'xterm', 'konsole', 'xfce4-terminal', etc.)
 
 
 class ADBAutomation:
@@ -18,20 +39,18 @@ class ADBAutomation:
         binary_name = self.ceserver_path.split("/")[-1]
         os.system("adb forward tcp:52734 tcp:52734")
         os.system(f"adb shell su -c pkill -f {binary_name}")
-        os.system(f"start cmd /k adb shell su -c .{self.ceserver_path} -p 52734")
+        open_terminal(f"adb shell su -c .{self.ceserver_path} -p 52734")
 
     def exec_frida_server(self):
         binary_name = self.frida_server_path.split("/")[-1]
         os.system(f"adb shell su -c pkill -f {binary_name}")
-        os.system(f"start cmd /k adb shell su -c .{self.frida_server_path}")
+        open_terminal(f"adb shell su -c .{self.frida_server_path}")
 
     def exec_gdbserver(self):
         os.system("adb forward tcp:1234 tcp:1234")
         binary_name = self.gdbserver_path.split("/")[-1]
         os.system(f"adb shell su -c pkill -f {binary_name}")
-        os.system(
-            f"start cmd /k adb shell su -c .{self.gdbserver_path} --multi 0.0.0.0:1234"
-        )
+        open_terminal(f"adb shell su -c .{self.gdbserver_path} --multi 0.0.0.0:1234")
 
 
 class SSHAutomation:
