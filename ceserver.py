@@ -1176,23 +1176,26 @@ def ceserver(pid, api, symbol_api, config, session):
         thread_count = 0
         s.bind(("127.0.0.1", listen_port))
         s.listen(32)
-        lock = threading.Lock()
+        s.settimeout(1)
         while True:
-            conn, addr = s.accept()
-            print("accept", addr)
-            native_client = 0
-            if NATIVE_CESERVER_IP != "":
-                target_ip = NATIVE_CESERVER_IP.split(":")[0]
-                target_port = NATIVE_CESERVER_IP.split(":")[1]
-                native_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                native_client.connect((target_ip, int(target_port)))
+            try:
+                conn, addr = s.accept()
+                print("accept", addr)
+                native_client = 0
+                if NATIVE_CESERVER_IP != "":
+                    target_ip = NATIVE_CESERVER_IP.split(":")[0]
+                    target_port = NATIVE_CESERVER_IP.split(":")[1]
+                    native_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    native_client.connect((target_ip, int(target_port)))
 
-            conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            # conn.settimeout(5000)
-            thread_count += 1
-            thread = threading.Thread(
-                target=main_thread,
-                args=([conn, native_client, thread_count]),
-                daemon=True,
-            )
-            thread.start()
+                conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+                # conn.settimeout(5000)
+                thread_count += 1
+                thread = threading.Thread(
+                    target=main_thread,
+                    args=([conn, native_client, thread_count]),
+                    daemon=True,
+                )
+                thread.start()
+            except socket.timeout:
+                continue
