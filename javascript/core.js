@@ -499,7 +499,7 @@ rpc.exports = {
     for (var i = 0; i < regionSize; i++) {
       var baseaddress = parseInt(regionList[i].base);
       var size = parseInt(regionList[i].size);
-      size = size - (size % 0x1000);
+      // size = size - (size % 0x1000);
       var protection = ProtectionStringToProtection(regionList[i].protection);
       var type = ProtectionStringToType(regionList[i].protection);
       if (protection == PAGE_NOACCESS) {
@@ -507,7 +507,11 @@ rpc.exports = {
       } else if (type == MEM_MAPPED) {
         if (noshared != 0) continue;
       }
-      regionInfos.push([baseaddress, size, protection, type]);
+      var filename = '';
+      try {
+        filename = regionList[i].file.path;
+      } catch (e) {}
+      regionInfos.push([baseaddress, size, protection, type, filename]);
     }
     return regionInfos;
   },

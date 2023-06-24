@@ -10,6 +10,7 @@ import threading
 import random
 import platform
 import subprocess
+import bisect
 from packaging.version import Version, parse
 import importlib.util
 import mono_pipeserver
@@ -65,6 +66,81 @@ PAGE_EXECUTE_READWRITE = 64
 
 MEM_MAPPED = 262144
 MEM_PRIVATE = 131072
+
+PROT_READ = 1
+PROT_WRITE = 2
+PROT_EXEC = 4
+
+MAP_SHARED = 1
+MAP_PRIVATE = 2
+MAP_ANONYMOUS = 32
+
+VQE_PAGEDONLY = 1
+VQE_DIRTYONLY = 2
+VQE_NOSHARED = 4
+
+RegionList = None
+
+
+def ProtectionStringToType(protectionstring):
+    if protectionstring.find("s") != -1:
+        return MEM_MAPPED
+    else:
+        return MEM_PRIVATE
+
+
+def ProtectionStringToProtection(protectionstring):
+    w = 0
+    x = 0
+
+    if protectionstring.find("x") != -1:
+        x = True
+    else:
+        x = False
+
+    if protectionstring.find("w") != -1:
+        w = True
+    else:
+        w = False
+
+    if x:
+        # executable
+        if w:
+            return PAGE_EXECUTE_READWRITE
+        else:
+            return PAGE_EXECUTE_READ
+    else:
+        # not executable
+        if w:
+            return PAGE_READWRITE
+        else:
+            return PAGE_READONLY
+
+
+def virtualqueryex(address):
+    global RegionList
+    if RegionList == None:
+        RegionList = API.VirtualQueryExFull(VQE_NOSHARED)
+    lpAddress = address
+    sorts = [region[0] + region[1] for region in RegionList]
+    index = bisect.bisect_left(sorts, lpAddress + 1)
+    if index == len(sorts):
+        return False
+    start = int(RegionList[index][0])
+    if start <= lpAddress:
+        base = lpAddress
+        size = RegionList[index][1]
+        protection = RegionList[index][2]
+        _type = RegionList[index][3]
+        filename = RegionList[index][4]
+        return [base, size, protection, _type, filename]
+    else:
+        base = lpAddress
+        size = start - lpAddress
+        protection = PAGE_NOACCESS
+        _type = 0
+        filename = ""
+        return [base, size, protection, _type, filename]
 
 
 class CECMD(IntEnum):
@@ -792,7 +868,7 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_VIRTUALQUERYEX:
         handle = reader.ReadInt32()
         baseaddress = reader.ReadUInt64()
-        ret = API.VirtualQueryEx(baseaddress)
+        ret = virtualqueryex(baseaddress)
         if ret != False:
             protection = ret[2]
             baseaddress = ret[0]
@@ -811,7 +887,7 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_GETREGIONINFO:
         handle = reader.ReadInt32()
         baseaddress = reader.ReadUInt64()
-        ret = API.VirtualQueryEx(baseaddress)
+        ret = virtualqueryex(baseaddress)
         if ret != False:
             protection = ret[2]
             baseaddress = ret[0]
