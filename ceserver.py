@@ -80,6 +80,8 @@ VQE_DIRTYONLY = 2
 VQE_NOSHARED = 4
 
 RegionList = None
+ModuleList = None
+ModuleListIterator = 0
 
 
 def ProtectionStringToType(protectionstring):
@@ -141,6 +143,31 @@ def virtualqueryex(address):
         _type = 0
         filename = ""
         return [base, size, protection, _type, filename]
+
+
+def module32first():
+    global ModuleList
+    global ModuleListIterator
+    if ModuleList == None:
+        ModuleList = API.EnumModules()
+    ModuleListIterator = 0
+    base = ModuleList[0]["base"]
+    size = ModuleList[0]["size"]
+    name = ModuleList[0]["name"]
+    ModuleListIterator += 1
+    return [base, size, name]
+
+
+def module32next():
+    global ModuleListIterator
+    if len(ModuleList) > ModuleListIterator:
+        base = ModuleList[ModuleListIterator]["base"]
+        size = ModuleList[ModuleListIterator]["size"]
+        name = ModuleList[ModuleListIterator]["name"]
+        ModuleListIterator += 1
+        return [base, size, name]
+    else:
+        return False
 
 
 class CECMD(IntEnum):
@@ -558,7 +585,7 @@ def handler(ns, nc, command, thread_count):
         pid = reader.ReadInt32()
         bytecode = b""
         if dwFlags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
-            ret = API.Module32First()
+            ret = module32first()
             while True:
                 if ret != False:
                     modulename = ret[2].encode()
@@ -590,7 +617,7 @@ def handler(ns, nc, command, thread_count):
                     bytecode = b"".join([bytecode, tmp])
                 else:
                     break
-                ret = API.Module32Next()
+                ret = module32next()
             if parse(CEVERSION) >= parse("7.6"):
                 tmp = pack("<iQIIII", 0, 0, 0, 0, 0, 0)
             else:
@@ -632,9 +659,9 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_MODULE32FIRST or command == CECMD.CMD_MODULE32NEXT:
         hSnapshot = reader.ReadInt32()
         if command == CECMD.CMD_MODULE32FIRST:
-            ret = API.Module32First()
+            ret = module32first()
         else:
-            ret = API.Module32Next()
+            ret = module32next()
         if ret != False:
             modulename = ret[2].encode()
             modulenamesize = len(modulename)

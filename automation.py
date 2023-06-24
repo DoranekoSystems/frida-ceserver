@@ -7,13 +7,14 @@ import threading
 import struct
 import paramiko
 import subprocess
-from applescript import tell
 
 
 def open_terminal(command):
     if os.name == "nt":  # For Windows
         subprocess.Popen(f'start cmd /k "{command}"', shell=True)
     elif sys.platform == "darwin":  # For MacOS
+        from applescript import tell
+
         cwd = os.getcwd()
         tell.app(
             "Terminal",

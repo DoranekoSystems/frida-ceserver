@@ -416,6 +416,9 @@ rpc.exports = {
       return false;
     }
   },
+  enummodules: function(){
+    return Process.enumerateModules();
+  },
   module32first: function () {
     moduleList = Process.enumerateModules();
     if (java_dissect) {
