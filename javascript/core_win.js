@@ -112,6 +112,9 @@ rpc.exports = {
       return false;
     }
   },
+  enummodules: function () {
+    return Process.enumerateModules();
+  },
   module32first: function () {
     moduleList = Process.enumerateModules();
     moduleListIterator = 0;
@@ -175,7 +178,11 @@ rpc.exports = {
       var size = parseInt(regionList[i].size);
       var protection = ProtectionStringToProtection(regionList[i].protection);
       var type = ProtectionStringToType(regionList[i].protection);
-      regionInfos.push([baseaddress, size, protection, type]);
+      var filename = '';
+      try {
+        filename = regionList[i].file.path;
+      } catch (e) {}
+      regionInfos.push([baseaddress, size, protection, type, filename]);
     }
     return regionInfos;
   },
@@ -260,5 +267,17 @@ rpc.exports = {
     var hThread = CreateThread(0, 0, ptr(startaddress), ptr(parameter), 0, dwThreadId);
     if (hThread == 0) return 0;
     else return 1;
+  },
+  extchangememoryprotection: function (address, size, protectionstring) {
+    var ret = Memory.protect(ptr(address), size, protectionstring);
+    return ret;
+  },
+  getthreadlist: function () {
+    var threads = Process.enumerateThreads();
+    var idlist = [];
+    for (var i = 0; i < threads.length; i++) {
+      idlist.push(parseInt(threads[i].id));
+    }
+    return idlist;
   },
 };
