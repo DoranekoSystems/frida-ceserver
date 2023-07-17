@@ -24,7 +24,6 @@ Original by Dark Byte.
 ### Debugger
 
 Implements lldb and gdb based debugger.  
-Support for `「Find out what accesses/writes this address」` only.
 
 - iOS(aarch64)
 - android(aarch64)
@@ -62,6 +61,10 @@ Then, connect to the Cheat Engine in network mode.
 The debugger is currently under development!
 
 ![img](https://user-images.githubusercontent.com/56913432/120924433-baa86600-c70e-11eb-8794-ab5c28ec50b6.png)
+
+<img width="450" alt="instbp" src="https://github.com/DoranekoSystems/frida-ceserver/assets/96031346/9fcdd82d-d67f-43d1-a7bd-77508cf230e7">
+
+<img width="360" alt="datawp" src="https://github.com/DoranekoSystems/frida-ceserver/assets/96031346/08a9de4f-eac1-4ad2-a231-f8260bebfdcb">
 
 # wiki
 
