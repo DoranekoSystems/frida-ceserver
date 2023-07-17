@@ -417,11 +417,17 @@ def debugger_thread():
                 threadid = c[1]
                 result = LLDB.step(threadid)
         else:
-            # first
-            if signal == -1:
-                result = LLDB.cont()
-            else:
-                result = LLDB.cont2(signal, thread)
+            IS_STOPPED = True
+            c = CONTINUE_QUEUE.get(block=True)
+            IS_STOPPED = False
+            if c[0] == 1:
+                if signal == -1:
+                    result = LLDB.cont()
+                else:
+                    result = LLDB.cont2(signal, thread)
+            elif c[0] == 2:
+                threadid = c[1]
+                result = LLDB.step(threadid)
         Lock.acquire()
         info = LLDB.parse_result(result)
         if is_debugserver:
@@ -437,13 +443,22 @@ def debugger_thread():
                 continue
             thread = int(info["thread"], 16)
             signal = int([x for x in info.keys() if x.find("T") == 0][0][1:3], 16)
-            if signal == 2 or signal == 5:
-                signal = 0
-            # watchpoint
             if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+                # watchpoint
                 metype = "6"
             else:
-                metype = "5"
+                # breakpoint
+                if signal == 5:
+                    metype = "6"
+                else:
+                    metype = "5"
+            if signal != 2 and signal != 5:
+                threadid = int(
+                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+                )
+                CONTINUE_QUEUE.put([1, threadid])
+            if signal == 2 or signal == 5:
+                signal = 0
 
         # Breadkpoint Exception
         if metype == "6":
@@ -455,25 +470,27 @@ def debugger_thread():
                 else:  # Watchpoint
                     medata = int(info["medata"], 16)
             else:
-                # example: 'T05watch': '0*"7fe22293dc'
-                medata = int(
-                    [info[x] for x in info.keys() if x.find("watch") != -1][0].split(
-                        '"'
-                    )[1],
-                    16,
-                )
+                # watchpoint
+                if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+                    # example: 'T05watch': '0*"7fe22293dc'
+                    medata = int(
+                        [info[x] for x in info.keys() if x.find("watch") != -1][
+                            0
+                        ].split('"')[1],
+                        16,
+                    )
+                    is_watchpoint = True
+                # breakpoint
+                else:
+                    address = struct.unpack(
+                        "<Q", bytes.fromhex(LLDB.encode_message(info["20"]))
+                    )[0]
+                    medata = address
+
             if medata > 0x100000:
                 threadid = int(
                     [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
                 )
-
-                if is_debugserver:
-                    pass
-                else:
-                    wp = [wp for wp in WP_INFO_LIST if wp["address"] == medata][0]
-                    ret1 = LLDB.remove_watchpoint(medata, wp["bpsize"], wp["type"])
-                    ret2 = LLDB.step(threadid)
-                    ret3 = LLDB.set_watchpoint(medata, wp["bpsize"], wp["type"])
 
                 if not is_debugserver:
                     registers = LLDB.get_register_info(threadid)
@@ -497,8 +514,6 @@ def debugger_thread():
                         try:
                             string = registers[i * 16 : i * 16 + 16]
                             address = struct.unpack("<Q", bytes.fromhex(string))[0]
-                            if i == 32:
-                                address -= 4
                         except Exception as e:
                             address = 0
                     register_list.append(address)
@@ -515,6 +530,7 @@ def debugger_thread():
             threadid = int(
                 [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
             )
+            setflag = False
             # set watchpoint
             for i in range(4):
                 wp = WP_INFO_LIST[i]
@@ -529,7 +545,7 @@ def debugger_thread():
                     print(f"Result:{ret}")
                     if ret:
                         WP_INFO_LIST[i]["enabled"] = True
-                    CONTINUE_QUEUE.put([1, threadid])
+                    setflag = True
 
             # remove watchpoint
             for i in range(4):
@@ -545,7 +561,9 @@ def debugger_thread():
                     print(f"Result:{ret}")
                     if ret:
                         WP_INFO_LIST[i]["enabled"] = False
-                    CONTINUE_QUEUE.put([1, threadid])
+                    setflag = True
+            if setflag:
+                CONTINUE_QUEUE.put([1, threadid])
 
         Lock.release()
 
@@ -902,7 +920,10 @@ def handler(ns, nc, command, thread_count):
         address = 0
         sendbyteCode = b""
         regionSize = 0
-        ret = API.VirtualQueryExFull(flags)
+        if IS_STOPPED:
+            ret = RegionList
+        else:
+            ret = API.VirtualQueryExFull(flags)
         regionSize = len(ret)
         for ri in ret:
             protection = ri[2]
@@ -1040,6 +1061,7 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         target_ip = DEBUGSERVER_IP.split(":")[0]
         target_port = int(DEBUGSERVER_IP.split(":")[1])
+
         LLDB = LLDBAutomation(target_ip, target_port)
         LLDB.attach(PID)
         t1 = threading.Thread(target=debugger_thread)

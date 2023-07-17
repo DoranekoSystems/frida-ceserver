@@ -29,6 +29,20 @@ class LLDBAutomation:
         sum = sum % 256
         return f"{sum:02x}"
 
+    def encode_message(self, message):
+        encode_message = ""
+        flag = False
+        for i in range(len(message)):
+            if message[i] == "*" and not flag:
+                flag = True
+                encode_message += message[i - 1] * (ord(message[i + 1]) - 29)
+            else:
+                if not flag:
+                    encode_message += message[i]
+                else:
+                    flag = False
+        return encode_message
+
     def send_message(self, message, recvflag=True):
         m = "$" + message + "#" + self.calc_checksum(message)
         self.s.send(m.encode())
@@ -67,18 +81,7 @@ class LLDBAutomation:
 
     def get_register_info(self, thread):
         message = self.send_message(f"g;thread:{thread}").decode()
-        encode_message = ""
-        flag = False
-        for i in range(len(message)):
-            if message[i] == "*" and not flag:
-                flag = True
-                encode_message += message[i - 1] * (ord(message[i + 1]) - 29)
-            else:
-                if not flag:
-                    encode_message += message[i]
-                else:
-                    flag = False
-        return encode_message
+        return self.encode_message(message)
 
     def read_register(self, regnum):
         result = self.send_message(f"p{regnum:02x}")
