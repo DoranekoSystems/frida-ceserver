@@ -57,6 +57,14 @@ class LLDBAutomation:
         result = self.send_message(f"x{address:02x},{size}")
         return result
 
+    def writemem(self, address, size, buffer_list):
+        buffer = "".join("{:02x}".format(x) for x in buffer_list)
+        result = self.send_message(f"M{address:02x},{size}:{buffer}")
+        if result == b"OK":
+            return True
+        else:
+            return False
+
     def get_register_info(self, thread):
         message = self.send_message(f"g;thread:{thread}").decode()
         encode_message = ""
@@ -72,10 +80,27 @@ class LLDBAutomation:
                     flag = False
         return encode_message
 
+    def read_register(self, regnum):
+        result = self.send_message(f"p{regnum:02x}")
+        if regnum == 33:
+            value = struct.unpack("<I", bytes.fromhex(result.decode()))[0]
+        else:
+            value = struct.unpack("<Q", bytes.fromhex(result.decode()))[0]
+        return value
+
+    def write_register(self, regnum, value):
+        result = self.send_message(f"P{regnum:02x}={value}")
+        if result == b"OK":
+            return True
+        else:
+            return False
+
     # 2:write 3:read 4:access
     def set_watchpoint(self, address, size, _type):
         command = ""
-        if _type == "w":
+        if _type == "x":
+            command = "Z0"
+        elif _type == "w":
             command = "Z2"
         elif _type == "r":
             command = "Z3"
@@ -93,7 +118,9 @@ class LLDBAutomation:
 
     def remove_watchpoint(self, address, size, _type):
         command = ""
-        if _type == "w":
+        if _type == "x":
+            command = "z0"
+        elif _type == "w":
             command = "z2"
         elif _type == "r":
             command = "z3"
