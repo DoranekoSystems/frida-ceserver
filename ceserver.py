@@ -17,6 +17,7 @@ import mono_pipeserver
 from define import OS
 from lldbauto import *
 import lz4.block
+import queue
 
 PID = 0
 API = 0
@@ -47,6 +48,8 @@ WP_INFO_LIST = [
     }
     for i in range(4)
 ]
+CONTINUE_QUEUE = queue.Queue()
+IS_STOPPED = False
 
 Lock = threading.Lock()
 
@@ -398,19 +401,33 @@ def interrupt_func():
 def debugger_thread():
     global REGISTER_INFO
     global WP_INFO_LIST
+    global IS_STOPPED
 
     signal = -1
     thread = -1
     is_debugserver = TARGETOS == OS.IOS.value or TARGETOS == OS.MAC.value
     while True:
         if is_debugserver:
-            result = LLDB.cont()
-        else:
-            # first
-            if signal == -1:
+            IS_STOPPED = True
+            c = CONTINUE_QUEUE.get(block=True)
+            IS_STOPPED = False
+            if c[0] == 1:
                 result = LLDB.cont()
-            else:
-                result = LLDB.cont2(signal, thread)
+            elif c[0] == 2:
+                threadid = c[1]
+                result = LLDB.step(threadid)
+        else:
+            IS_STOPPED = True
+            c = CONTINUE_QUEUE.get(block=True)
+            IS_STOPPED = False
+            if c[0] == 1:
+                if signal == -1:
+                    result = LLDB.cont()
+                else:
+                    result = LLDB.cont2(signal, thread)
+            elif c[0] == 2:
+                threadid = c[1]
+                result = LLDB.step(threadid)
         Lock.acquire()
         info = LLDB.parse_result(result)
         if is_debugserver:
@@ -426,38 +443,54 @@ def debugger_thread():
                 continue
             thread = int(info["thread"], 16)
             signal = int([x for x in info.keys() if x.find("T") == 0][0][1:3], 16)
-            if signal == 2 or signal == 5:
-                signal = 0
-            # watchpoint
             if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+                # watchpoint
                 metype = "6"
             else:
-                metype = "5"
+                # breakpoint
+                if signal == 5:
+                    metype = "6"
+                else:
+                    metype = "5"
+            if signal != 2 and signal != 5:
+                threadid = int(
+                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+                )
+                CONTINUE_QUEUE.put([1, threadid])
+            if signal == 2 or signal == 5:
+                signal = 0
 
         # Breadkpoint Exception
         if metype == "6":
             if is_debugserver:
                 medata = int(info["medata"], 16)
+                if medata == 1:  # Breakpoint
+                    address = struct.unpack("<Q", bytes.fromhex(info["20"]))[0]
+                    medata = address
+                else:  # Watchpoint
+                    medata = int(info["medata"], 16)
             else:
-                # example: 'T05watch': '0*"7fe22293dc'
-                medata = int(
-                    [info[x] for x in info.keys() if x.find("watch") != -1][0].split(
-                        '"'
-                    )[1],
-                    16,
-                )
+                # watchpoint
+                if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+                    # example: 'T05watch': '0*"7fe22293dc'
+                    medata = int(
+                        [info[x] for x in info.keys() if x.find("watch") != -1][
+                            0
+                        ].split('"')[1],
+                        16,
+                    )
+                    is_watchpoint = True
+                # breakpoint
+                else:
+                    address = struct.unpack(
+                        "<Q", bytes.fromhex(LLDB.encode_message(info["20"]))
+                    )[0]
+                    medata = address
+
             if medata > 0x100000:
                 threadid = int(
                     [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
                 )
-
-                if is_debugserver:
-                    result = LLDB.step(threadid)
-                else:
-                    wp = [wp for wp in WP_INFO_LIST if wp["address"] == medata][0]
-                    ret1 = LLDB.remove_watchpoint(medata, wp["bpsize"], wp["type"])
-                    ret2 = LLDB.step(threadid)
-                    ret3 = LLDB.set_watchpoint(medata, wp["bpsize"], wp["type"])
 
                 if not is_debugserver:
                     registers = LLDB.get_register_info(threadid)
@@ -481,8 +514,6 @@ def debugger_thread():
                         try:
                             string = registers[i * 16 : i * 16 + 16]
                             address = struct.unpack("<Q", bytes.fromhex(string))[0]
-                            if i == 32:
-                                address -= 4
                         except Exception as e:
                             address = 0
                     register_list.append(address)
@@ -499,6 +530,7 @@ def debugger_thread():
             threadid = int(
                 [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
             )
+            setflag = False
             # set watchpoint
             for i in range(4):
                 wp = WP_INFO_LIST[i]
@@ -513,6 +545,7 @@ def debugger_thread():
                     print(f"Result:{ret}")
                     if ret:
                         WP_INFO_LIST[i]["enabled"] = True
+                    setflag = True
 
             # remove watchpoint
             for i in range(4):
@@ -528,6 +561,9 @@ def debugger_thread():
                     print(f"Result:{ret}")
                     if ret:
                         WP_INFO_LIST[i]["enabled"] = False
+                    setflag = True
+            if setflag:
+                CONTINUE_QUEUE.put([1, threadid])
 
         Lock.release()
 
@@ -567,6 +603,7 @@ def handler(ns, nc, command, thread_count):
     global LLDB
     global REGISTER_INFO
     global WP_INFO_LIST
+    global CONTINUE_QUEUE
 
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
@@ -866,7 +903,10 @@ def handler(ns, nc, command, thread_count):
                         t1.start()
                     ret = True
                 else:
-                    ret = API.WriteProcessMemory(address, list(_buf))
+                    if IS_STOPPED:
+                        ret = LLDB.writemem(address, len(_buf), list(_buf))
+                    else:
+                        ret = API.WriteProcessMemory(address, list(_buf))
             if ret != False:
                 writer.WriteInt32(size)
             else:
@@ -880,7 +920,10 @@ def handler(ns, nc, command, thread_count):
         address = 0
         sendbyteCode = b""
         regionSize = 0
-        ret = API.VirtualQueryExFull(flags)
+        if IS_STOPPED:
+            ret = RegionList
+        else:
+            ret = API.VirtualQueryExFull(flags)
         regionSize = len(ret)
         for ri in ret:
             protection = ri[2]
@@ -1018,6 +1061,7 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         target_ip = DEBUGSERVER_IP.split(":")[0]
         target_port = int(DEBUGSERVER_IP.split(":")[1])
+
         LLDB = LLDBAutomation(target_ip, target_port)
         LLDB.attach(PID)
         t1 = threading.Thread(target=debugger_thread)
@@ -1056,13 +1100,14 @@ def handler(ns, nc, command, thread_count):
                 writer.WriteInt64(threadid)
                 writer.WriteUInt64(event["address"])
         else:
-            time.sleep(timeout / 1000)
+            time.sleep(timeout / (1000 * 20))
             writer.WriteInt32(0)
 
     elif command == CECMD.CMD_CONTINUEFROMDEBUGEVENT:
         handle = reader.ReadInt32()
         tid = reader.ReadInt32()
         ignore = reader.ReadInt32()
+        CONTINUE_QUEUE.put([ignore, tid])
         writer.WriteInt32(1)
 
     elif command == CECMD.CMD_SETBREAKPOINT:
@@ -1073,26 +1118,37 @@ def handler(ns, nc, command, thread_count):
         bptype = reader.ReadInt32()
         bpsize = reader.ReadInt32()
 
-        # executebp not support
-        if bptype == 0:
-            writer.WriteInt32(0)
+        wp = WP_INFO_LIST[debugreg]
+        # auto
+        if tid != -1:
+            if IS_STOPPED:
+                LLDB.set_watchpoint(address, wp["bpsize"], wp["type"])
+            writer.WriteInt32(1)
+        # manual
         else:
-            wp = WP_INFO_LIST[debugreg]
             if wp["switch"] == False and wp["enabled"] == False:
-                print("CMD_SETBREAKPOINT")
                 _type = ""
-                if bptype == 1:
+                if bptype == 0:
+                    _type = "x"
+                    bpsize = 4
+                elif bptype == 1:
                     _type = "w"
                 elif bptype == 2:
                     _type = "r"
                 elif bptype == 3:
                     _type = "a"
+                if IS_STOPPED:
+                    ret = LLDB.set_watchpoint(address, bpsize, _type)
+                    enabled = True
+                else:
+                    print("CMD_SETBREAKPOINT")
+                    enabled = False
                 bp = {
                     "address": address,
                     "bpsize": bpsize,
                     "type": _type,
                     "switch": True,
-                    "enabled": False,
+                    "enabled": enabled,
                 }
                 WP_INFO_LIST[debugreg] = bp
                 writer.WriteInt32(1)
@@ -1105,12 +1161,20 @@ def handler(ns, nc, command, thread_count):
         debugreg = reader.ReadInt32()
         wasWatchpoint = reader.ReadInt32()
         wp = WP_INFO_LIST[debugreg]
-
         if tid != -1:
+            if IS_STOPPED:
+                LLDB.remove_watchpoint(wp["address"], wp["bpsize"], wp["type"])
             writer.WriteInt32(1)
         else:
             if wp["switch"] == True and wp["enabled"] == True:
-                print("CMD_REMOVEBREAKPOINT")
+                if IS_STOPPED:
+                    ret = LLDB.remove_watchpoint(
+                        wp["address"], wp["bpsize"], wp["type"]
+                    )
+                    if ret:
+                        WP_INFO_LIST[debugreg]["enabled"] = False
+                else:
+                    print("CMD_REMOVEBREAKPOINT")
                 WP_INFO_LIST[debugreg]["switch"] = False
                 writer.WriteInt32(1)
             else:
@@ -1148,7 +1212,17 @@ def handler(ns, nc, command, thread_count):
             handle = reader.ReadInt32()
             tid = reader.ReadInt32()
             structsize = reader.ReadInt32()
-            ns.recv(structsize)
+            context = ns.recv(structsize)
+            for i in range(1, 34):
+                try:
+                    value = struct.unpack("<Q", context[i * 8 : i * 8 + 8])[0]
+                    if REGISTER_INFO[i - 1] != value:
+                        if LLDB.write_register(
+                            i - 1, int.to_bytes(value, 8, "little").hex()
+                        ):
+                            REGISTER_INFO[i - 1] = value
+                except Exception as e:
+                    address = 0
             writer.WriteInt32(1)
         else:
             print("SETTHREADCONTEXT not support.")
