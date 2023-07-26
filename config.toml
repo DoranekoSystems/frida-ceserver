@@ -1,5 +1,9 @@
 # https://github.com/DoranekoSystems/frida-ceserver/wiki/Config
-[general]
+[base]
+# frida or memprocfs
+engine = "frida"
+
+[frida.general]
 target =  ""
 targetOS = "ios"
 mode =  "attach"
@@ -9,12 +13,12 @@ arch = 3
 ceversion =  "7.5"
 listen_port = 52736
 
-[ipconfig]
+[frida.ipconfig]
 frida_server_ip =  ""
 native_ceserver_ip =  ""
 debugserver_ip =  ""
  
-[ssh_auto]
+[frida.ssh_auto]
 enable = false
 ip = ""
 username = ""
@@ -22,16 +26,24 @@ password = ""
 ceserver_path =""
 debugserver_path = ""
 
-[adb_auto]
+[frida.adb_auto]
 enable = false
 frida_server_path = ""
 ceserver_path = ""
 gdbserver_path = ""
 
-[extended_function]
+[frida.extended_function]
 custom_read_memory = false
 fix_module_size =  false
 manualParser = false
 javaDissect  = false
 custom_symbol_loader =  ""
 data_collector = ""
+
+[memprocfs.general]
+# example:"pmem://C:\\pmem\\winpmem_x64.sys"
+device = ""
+# 0:i386 1:x86_64 2:arm 3:aarch64
+arch = 1
+ceversion =  "7.5"
+listen_port = 52736

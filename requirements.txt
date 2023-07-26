@@ -5,3 +5,4 @@ toml
 lz4
 windows-curses
 colorama
+memprocfs

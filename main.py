@@ -3,6 +3,7 @@ import threading
 import time
 import sys
 import ceserver as ce
+import ceserver_memprocfs as cememprocfs
 import toml
 from define import OS, MODE
 from automation import *
@@ -158,35 +159,43 @@ def main(package, pid=None, run_mode=None, memory_address=None):
     ce.ceserver(process_id, api, symbol_api, config, session)
 
 
+def memprocfs_main(config):
+    cememprocfs.ceserver(config)
+
+
 if __name__ == "__main__":
     args = sys.argv
-    target = config["general"]["target"]
-    targetOS = config["general"]["targetOS"]
-    binary_path = config["general"]["binary_path"]
-    if "--memoryview" in args:
-        memory_address = int(args[args.index("--memoryview") + 1], 16)
-        run_mode = "memoryview"
-        pid = int(args[2])
-        main(None, pid, run_mode, memory_address)
+    if config["base"]["engine"] == "memprocfs":
+        memprocfs_main(config["memprocfs"])
     else:
-        if targetOS in [OS.ANDROID.value, OS.IOS.value]:
-            if target == "":
-                if args[1] == "-p" or args[1] == "--pid":
-                    pid = int(args[2])
-                    main(None, pid)
-                else:
-                    main(args[1])
-            else:
-                main(target)
+        config = config["frida"]
+        target = config["general"]["target"]
+        targetOS = config["general"]["targetOS"]
+        binary_path = config["general"]["binary_path"]
+        if "--memoryview" in args:
+            memory_address = int(args[args.index("--memoryview") + 1], 16)
+            run_mode = "memoryview"
+            pid = int(args[2])
+            main(None, pid, run_mode, memory_address)
         else:
-            if target == "":
-                if binary_path == "":
+            if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+                if target == "":
                     if args[1] == "-p" or args[1] == "--pid":
                         pid = int(args[2])
                         main(None, pid)
                     else:
                         main(args[1])
                 else:
-                    main("")
+                    main(target)
             else:
-                main(target)
+                if target == "":
+                    if binary_path == "":
+                        if args[1] == "-p" or args[1] == "--pid":
+                            pid = int(args[2])
+                            main(None, pid)
+                        else:
+                            main(args[1])
+                    else:
+                        main("")
+                else:
+                    main(target)
