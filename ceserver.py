@@ -630,7 +630,7 @@ def handler(ns, nc, command, thread_count):
                     modulebase = int(ret[0], 16)
                     modulepart = 0
                     modulesize = ret[1]
-                    if parse(CEVERSION) >= parse("7.6"):
+                    if parse(CEVERSION) >= parse("7.5.1"):
                         tmp = pack(
                             "<iQIIII" + str(modulenamesize) + "s",
                             1,
@@ -655,7 +655,7 @@ def handler(ns, nc, command, thread_count):
                 else:
                     break
                 ret = module32next()
-            if parse(CEVERSION) >= parse("7.6"):
+            if parse(CEVERSION) >= parse("7.5.1"):
                 tmp = pack("<iQIIII", 0, 0, 0, 0, 0, 0)
             else:
                 tmp = pack("<iQIII", 0, 0, 0, 0, 0)
@@ -705,7 +705,7 @@ def handler(ns, nc, command, thread_count):
             modulebase = int(ret[0], 16)
             modulepart = 0
             modulesize = ret[1]
-            if parse(CEVERSION) >= parse("7.6"):
+            if parse(CEVERSION) >= parse("7.5.1"):
                 bytecode = pack(
                     "<iQIIII" + str(modulenamesize) + "s",
                     1,
@@ -983,7 +983,7 @@ def handler(ns, nc, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.6"):
+        if parse(CEVERSION) >= parse("7.5.1"):
             version = 6
             versionstring = "CHEATENGINE Network 2.3".encode()
         elif parse(CEVERSION) >= parse("7.4.3"):
