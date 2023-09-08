@@ -417,7 +417,19 @@ rpc.exports = {
     }
   },
   enummodules: function () {
-    return Process.enumerateModules();
+    var moduleList =  Process.enumerateModules();
+    if (java_dissect) {
+      moduleList.push({ base: '0xcececece', size: 0, name: 'jvm.dll' });
+      moduleList.push({ base: '0xecececec', size: 0, name: 'CEJVMTI.dll' });
+    }
+    if (data_collector == 'mono' || data_collector == 'objc') {
+      moduleList.push({
+        base: '0xcececece',
+        size: 0x40000,
+        name: 'libmono-datacollector-dummy.so',
+      });
+    }
+    return moduleList;
   },
   module32first: function () {
     moduleList = Process.enumerateModules();

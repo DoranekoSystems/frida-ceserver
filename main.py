@@ -154,6 +154,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
                     process_id,
                     session,
                 ),
+                daemon=True
             )
             jthread.start()
     ce.ceserver(process_id, api, symbol_api, config, session)

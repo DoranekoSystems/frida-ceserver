@@ -183,7 +183,7 @@ API = 0
 
 
 def handler(command):
-    # print(str(CEPIPECMD(command)))
+    # print(str(CEPIPECMD(command).name))
     if command == CEPIPECMD.MONOCMD_INITMONO:
         API.InitMono()
     elif command == CEPIPECMD.MONOCMD_ISIL2CPP:
