@@ -407,27 +407,14 @@ def debugger_thread():
     thread = -1
     is_debugserver = TARGETOS == OS.IOS.value or TARGETOS == OS.MAC.value
     while True:
-        if is_debugserver:
-            IS_STOPPED = True
-            c = CONTINUE_QUEUE.get(block=True)
-            IS_STOPPED = False
-            if c[0] == 1:
-                result = LLDB.cont()
-            elif c[0] == 2:
-                threadid = c[1]
-                result = LLDB.step(threadid)
-        else:
-            IS_STOPPED = True
-            c = CONTINUE_QUEUE.get(block=True)
-            IS_STOPPED = False
-            if c[0] == 1:
-                if signal == -1:
-                    result = LLDB.cont()
-                else:
-                    result = LLDB.cont2(signal, thread)
-            elif c[0] == 2:
-                threadid = c[1]
-                result = LLDB.step(threadid)
+        IS_STOPPED = True
+        c = CONTINUE_QUEUE.get(block=True)
+        IS_STOPPED = False
+        if c[0] == 1:
+            result = LLDB.cont()
+        elif c[0] == 2:
+            threadid = c[1]
+            result = LLDB.step(threadid)
         Lock.acquire()
         info = LLDB.parse_result(result)
         if is_debugserver:
@@ -436,14 +423,24 @@ def debugger_thread():
                 Lock.release()
                 continue
             metype = info["metype"]
+            threadid = int(
+                [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
+            )
         else:
-            if "thread" not in info:
+            try:
+                tkey = [
+                    x
+                    for x in info.keys()
+                    if (x.find("T") == 0 and x.find("thread") != -1)
+                ][0]
+            except:
                 print("Debugger Thread:info is empty.")
                 Lock.release()
                 continue
-            thread = int(info["thread"], 16)
+            thread = int(info[tkey], 16)
+            threadid = thread
             signal = int([x for x in info.keys() if x.find("T") == 0][0][1:3], 16)
-            if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
+            if info["reason"] == "watchpoint":
                 # watchpoint
                 metype = "6"
             else:
@@ -452,13 +449,6 @@ def debugger_thread():
                     metype = "6"
                 else:
                     metype = "5"
-            if signal != 2 and signal != 5:
-                threadid = int(
-                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
-                )
-                CONTINUE_QUEUE.put([1, threadid])
-            if signal == 2 or signal == 5:
-                signal = 0
 
         # Breadkpoint Exception
         if metype == "6":
@@ -471,15 +461,11 @@ def debugger_thread():
                     medata = int(info["medata"], 16)
             else:
                 # watchpoint
-                if len([x for x in info.keys() if x.find("watch") != -1]) > 0:
-                    # example: 'T05watch': '0*"7fe22293dc'
-                    medata = int(
-                        [info[x] for x in info.keys() if x.find("watch") != -1][
-                            0
-                        ].split('"')[1],
-                        16,
-                    )
-                    is_watchpoint = True
+                if info["reason"] == "watchpoint":
+                    description = info["description"]
+                    ascii_string = bytearray.fromhex(description).decode()
+                    extracted_sequence = ascii_string.split()[0]
+                    medata = int(extracted_sequence)
                 # breakpoint
                 else:
                     address = struct.unpack(
@@ -488,16 +474,9 @@ def debugger_thread():
                     medata = address
 
             if medata > 0x100000:
-                threadid = int(
-                    [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
-                )
-
-                if not is_debugserver:
-                    registers = LLDB.get_register_info(threadid)
-
                 register_list = []
-                for i in range(34):
-                    if is_debugserver:
+                if ARCH == 3:
+                    for i in range(34):
                         try:
                             if i == 33:
                                 address = struct.unpack(
@@ -510,13 +489,9 @@ def debugger_thread():
 
                         except Exception as e:
                             address = 0
-                    else:
-                        try:
-                            string = registers[i * 16 : i * 16 + 16]
-                            address = struct.unpack("<Q", bytes.fromhex(string))[0]
-                        except Exception as e:
-                            address = 0
-                    register_list.append(address)
+                        register_list.append(address)
+                else:
+                    pass
 
                 event = {
                     "debugevent": 5,
@@ -527,9 +502,6 @@ def debugger_thread():
                 DEBUG_EVENT.append(event)
 
         if metype == "5" or metype == "6":
-            threadid = int(
-                [info[x] for x in info.keys() if x.find("thread") != -1][0], 16
-            )
             setflag = False
             # set watchpoint
             for i in range(4):
@@ -1005,10 +977,17 @@ def handler(ns, nc, command, thread_count):
         ns.sendall(bytecode)
 
     elif command == CECMD.CMD_GETSYMBOLLISTFROMFILE:
-        symbolpathsize = reader.ReadInt16()
-        symbolname = ns.recv(symbolpathsize + 2).decode()
-        output = [0]
-        GetSymbolListFromFile(symbolname[2:], output)
+        if parse(CEVERSION) >= parse("7.5.1"):
+            fileoffset = reader.ReadUInt32()
+            symbolpathsize = reader.ReadUInt32()
+            symbolname = ns.recv(symbolpathsize).decode()
+            output = [0]
+            GetSymbolListFromFile(symbolname, output)
+        else:
+            symbolpathsize = reader.ReadInt16()
+            symbolname = ns.recv(symbolpathsize + 2).decode()
+            output = [0]
+            GetSymbolListFromFile(symbolname[2:], output)
         ns.sendall(output[0])
 
     elif command == CECMD.CMD_LOADEXTENSION:

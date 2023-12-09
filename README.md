@@ -23,7 +23,7 @@ Original by Dark Byte.
 
 ### Debugger
 
-Implements lldb and gdb based debugger.  
+Implements lldb based debugger.  
 
 - iOS(aarch64)
 - android(aarch64)
