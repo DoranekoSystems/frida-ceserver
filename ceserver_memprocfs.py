@@ -336,7 +336,7 @@ def handler(ns, command, thread_count):
                     modulebase = ret[0]
                     modulepart = 0
                     modulesize = ret[1]
-                    if parse(CEVERSION) >= parse("7.6"):
+                    if parse(CEVERSION) >= parse("7.5.1"):
                         tmp = pack(
                             "<iQIIII" + str(modulenamesize) + "s",
                             1,
@@ -361,7 +361,7 @@ def handler(ns, command, thread_count):
                 else:
                     break
                 ret = module32next()
-            if parse(CEVERSION) >= parse("7.6"):
+            if parse(CEVERSION) >= parse("7.5.1"):
                 tmp = pack("<iQIIII", 0, 0, 0, 0, 0, 0)
             else:
                 tmp = pack("<iQIII", 0, 0, 0, 0, 0)
@@ -408,10 +408,10 @@ def handler(ns, command, thread_count):
         if ret != False:
             modulename = ret[2].encode()
             modulenamesize = len(modulename)
-            modulebase = int(ret[0], 16)
+            modulebase = ret[0]
             modulepart = 0
             modulesize = ret[1]
-            if parse(CEVERSION) >= parse("7.6"):
+            if parse(CEVERSION) >= parse("7.5.1"):
                 bytecode = pack(
                     "<iQIIII" + str(modulenamesize) + "s",
                     1,
@@ -576,7 +576,7 @@ def handler(ns, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.6"):
+        if parse(CEVERSION) >= parse("7.5.1"):
             version = 6
             versionstring = "CHEATENGINE Network 2.3".encode()
         elif parse(CEVERSION) >= parse("7.4.3"):
@@ -598,10 +598,17 @@ def handler(ns, command, thread_count):
         ns.sendall(bytecode)
 
     elif command == CECMD.CMD_GETSYMBOLLISTFROMFILE:
-        symbolpathsize = reader.ReadInt16()
-        symbolname = ns.recv(symbolpathsize + 2).decode()
-        output = [0]
-        GetSymbolListFromFile(symbolname[2:], output)
+        if parse(CEVERSION) >= parse("7.5.1"):
+            fileoffset = reader.ReadUInt32()
+            symbolpathsize = reader.ReadUInt32()
+            symbolname = ns.recv(symbolpathsize).decode()
+            output = [0]
+            GetSymbolListFromFile(symbolname, output)
+        else:
+            symbolpathsize = reader.ReadInt16()
+            symbolname = ns.recv(symbolpathsize + 2).decode()
+            output = [0]
+            GetSymbolListFromFile(symbolname[2:], output)
         ns.sendall(output[0])
 
     elif command == CECMD.CMD_LOADEXTENSION:

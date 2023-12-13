@@ -45,5 +45,5 @@ data_collector = ""
 device = ""
 # 0:i386 1:x86_64 2:arm 3:aarch64
 arch = 1
-ceversion =  "7.5"
+ceversion =  "7.5.1"
 listen_port = 52736
