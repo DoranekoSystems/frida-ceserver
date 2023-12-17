@@ -36,6 +36,7 @@ CUSTOM_READ_MEMORY = 0
 DATA_COLLECTOR = 0
 
 LLDB = 0
+LLDB_REGISTER_COUNT = 255
 DEBUG_EVENT = []
 REGISTER_INFO = []
 WP_INFO_LIST = [
@@ -46,7 +47,7 @@ WP_INFO_LIST = [
         "switch": False,
         "enabled": False,
     }
-    for i in range(4)
+    for i in range(LLDB_REGISTER_COUNT)
 ]
 CONTINUE_QUEUE = queue.Queue()
 IS_STOPPED = False
@@ -504,7 +505,7 @@ def debugger_thread():
         if metype == "5" or metype == "6":
             setflag = False
             # set watchpoint
-            for i in range(4):
+            for i in range(LLDB_REGISTER_COUNT):
                 wp = WP_INFO_LIST[i]
                 if wp["switch"] == True and wp["enabled"] == False:
                     address = wp["address"]
@@ -520,7 +521,7 @@ def debugger_thread():
                     setflag = True
 
             # remove watchpoint
-            for i in range(4):
+            for i in range(LLDB_REGISTER_COUNT):
                 wp = WP_INFO_LIST[i]
                 if wp["switch"] == False and wp["enabled"] == True:
                     address = wp["address"]
@@ -1051,9 +1052,9 @@ def handler(ns, nc, command, thread_count):
         event = {
             "debugevent": -2,
             "threadid": PID,
-            "maxBreakpointCount": 4,
+            "maxBreakpointCount": LLDB_REGISTER_COUNT,
             "maxWatchpointCount": 4,
-            "maxSharedBreakpoints": 4,
+            "maxSharedBreakpoints": LLDB_REGISTER_COUNT,
         }
         DEBUG_EVENT.append(event)
         writer.WriteInt32(1)
@@ -1069,9 +1070,9 @@ def handler(ns, nc, command, thread_count):
             if debugevent == -2:
                 writer.WriteInt32(debugevent)
                 writer.WriteInt64(threadid)
-                writer.WriteInt8(event["maxBreakpointCount"])
+                writer.WriteUInt8(event["maxBreakpointCount"])
                 writer.WriteInt8(event["maxWatchpointCount"])
-                writer.WriteInt8(event["maxSharedBreakpoints"])
+                writer.WriteUInt8(event["maxSharedBreakpoints"])
                 ns.sendall(b"\x00" * 5)
             elif debugevent == 5:
                 REGISTER_INFO = event["register"]

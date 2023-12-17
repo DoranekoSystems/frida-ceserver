@@ -3,7 +3,11 @@ import threading
 import time
 import sys
 import ceserver as ce
-import ceserver_memprocfs as cememprocfs
+import platform
+
+hostos = platform.system()
+if hostos == "Windows":
+    import ceserver_memprocfs as cememprocfs
 import toml
 from define import OS, MODE
 from automation import *
@@ -154,7 +158,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
                     process_id,
                     session,
                 ),
-                daemon=True
+                daemon=True,
             )
             jthread.start()
     ce.ceserver(process_id, api, symbol_api, config, session)
