@@ -14,7 +14,7 @@ WriteQword = 4
 WriteUtf8String = 5
 DecodeObject = 6
 
-MONO_DATACOLLECTORVERSION = 20221207
+MONO_DATACOLLECTORVERSION = 20231214
 
 PID = 0
 API = 0
@@ -52,7 +52,7 @@ class CEPIPECMD(IntEnum):
     MONOCMD_GETMETHODSIGNATURE = 24
     MONOCMD_GETPARENTCLASS = 25
     MONOCMD_GETSTATICFIELDADDRESSFROMCLASS = 26
-    MONOCMD_GETTYPECLASS = 27
+    MONOCMD_GETFIELDCLASS = 27
     MONOCMD_GETARRAYELEMENTCLASS = 28
     MONOCMD_FINDMETHODBYDESC = 29
     MONOCMD_INVOKEMETHOD = 30
@@ -73,6 +73,21 @@ class CEPIPECMD(IntEnum):
     MONOCMD_GETCLASSNESTINGTYPE = 45
     MONOCMD_LIMITEDCONNECTION = 46
     MONOCMD_GETMONODATACOLLECTORVERSION = 47
+    MONOCMD_NEWSTRING = 48
+    MONOCMD_ENUMIMAGES = 49
+    MONOCMD_ENUMCLASSESINIMAGEEX = 50
+    MONOCMD_ISCLASSENUM = 51
+    MONOCMD_ISCLASSVALUETYPE = 52
+    MONOCMD_ISCLASSISSUBCLASSOF = 53
+    MONOCMD_ARRAYELEMENTSIZE = 54
+    MONOCMD_GETCLASSTYPE = 55
+    MONOCMD_GETCLASSOFTYPE = 56
+    MONOCMD_GETTYPEOFMONOTYPE = 57
+    MONOCMD_GETREFLECTIONTYPEOFCLASSTYPE = 58
+    MONOCMD_GETREFLECTIONMETHODOFMONOMETHOD = 59
+    MONOCMD_MONOOBJECTUNBOX = 60
+    MONOCMD_MONOARRAYNEW = 61
+    MONOCMD_ENUMINTERFACESOFCLASS = 62
 
 
 class BinaryReader:
@@ -128,6 +143,9 @@ class BinaryReader:
         self.read_message = self.read_message[self.index + 8 :]
         return ret
 
+    def GetMessageSize(self):
+        return len(self.read_message)
+
     def WriteMessage(self, message):
         self.read_message += message
 
@@ -171,10 +189,16 @@ class BinaryWriter:
     def WriteUtf8String(self, message):
         self.write_message += message.encode()
 
+    def WriteByteArray(self, message):
+        self.write_message += message
+
     def ReadMessage(self, size):
         ret = self.write_message[0:size]
         self.write_message = self.write_message[size:]
         return ret
+
+    def GetMessageSize(self):
+        return len(self.write_message)
 
 
 WRITER = BinaryWriter()
@@ -279,6 +303,24 @@ def handler(command):
         WRITER.WriteUInt64(methodPtr)
     elif command == CEPIPECMD.MONOCMD_GETMONODATACOLLECTORVERSION:
         WRITER.WriteUInt32(MONO_DATACOLLECTORVERSION)
+    elif command == CEPIPECMD.MONOCMD_ENUMIMAGES:
+        data = API.EnumImages()
+        WRITER.WriteUInt32(len(data))
+        WRITER.WriteByteArray(data)
+    elif command == CEPIPECMD.MONOCMD_ENUMCLASSESINIMAGEEX:
+        yield 0
+        image = READER.ReadUInt64()
+        data = API.EnumClassesInImageEX(image)
+        WRITER.WriteUInt32(len(data))
+        WRITER.WriteByteArray(data)
+    elif command == CEPIPECMD.MONOCMD_GETFIELDCLASS:
+        yield 0
+        field = READER.ReadUInt64()
+        API.GetFieldClass(field)
+    elif command == CEPIPECMD.MONOCMD_ISCLASSVALUETYPE:
+        yield 0
+        klass = READER.ReadUInt64()
+        API.IsValueTypeClass(klass)
     else:
         pass
     yield 1
@@ -292,27 +334,34 @@ def mono_process(buf):
     global IS_COMMAND
     global HANDLER
     READER.WriteMessage(buf)
-    if IS_COMMAND:
-        try:
-            IS_COMMAND = False
-            command = READER.ReadUInt8()
-            HANDLER = handler(command)
-            ret = HANDLER.__next__()
-            if ret == 1:
-                IS_COMMAND = True
-        except:
-            import traceback
+    while READER.GetMessageSize() > 0:
+        if IS_COMMAND:
+            try:
+                IS_COMMAND = False
+                command = READER.ReadUInt8()
+                HANDLER = handler(command)
+                ret = HANDLER.__next__()
+                if ret == 1:
+                    IS_COMMAND = True
+            except:
+                import traceback
 
-            print("EXCEPTION:" + str(CEPIPECMD(command)))
-            traceback.print_exc()
-            return
-        if ret == -1:
-            return
-        return
-    else:
-        ret = HANDLER.__next__()
-        if ret == 1:
-            IS_COMMAND = True
+                print("EXCEPTION:" + str(CEPIPECMD(command)))
+                traceback.print_exc()
+                return
+            if ret == -1:
+                return
+        else:
+            try:
+                ret = HANDLER.__next__()
+                if ret == 1:
+                    IS_COMMAND = True
+            except:
+                import traceback
+
+                print("EXCEPTION:" + str(CEPIPECMD(command)))
+                traceback.print_exc()
+                return
 
 
 def on_message(message, data):

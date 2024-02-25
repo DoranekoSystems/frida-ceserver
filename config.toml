@@ -38,6 +38,7 @@ fix_module_size =  false
 manualParser = false
 javaDissect  = false
 custom_symbol_loader =  ""
+# mono:il2cpp_data_collector
 data_collector = ""
 
 [memprocfs.general]

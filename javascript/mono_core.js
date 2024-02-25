@@ -10,6 +10,11 @@ function dump(pointer, length) {
   );
 }
 
+const MONO_TYPE_NAME_FORMAT_IL = 0;
+const MONO_TYPE_NAME_FORMAT_REFLECTION = 1;
+const MONO_TYPE_NAME_FORMAT_FULL_NAME = 2;
+const MONO_TYPE_NAME_FORMAT_ASSEMBLY_QUALIFIED = 3;
+
 const CMD_WriteByte = 1;
 const CMD_WriteWord = 2;
 const CMD_WriteDword = 3;
@@ -100,6 +105,9 @@ var mono_metadata_string_heapPtr = Module.findExportByName(
 );
 
 var mono_class_getPtr = Module.findExportByName(coreLibraryName, 'il2cpp_class_get');
+var mono_class_from_typePtr = Module.findExportByName(coreLibraryName, 'il2cpp_class_from_type');
+var mono_class_from_type = new NativeFunction(mono_class_from_typePtr, 'pointer', ['pointer']);
+
 var mono_class_from_typerefPtr = Module.findExportByName(
   coreLibraryName,
   'il2cpp_class_from_typeref'
@@ -151,6 +159,17 @@ var mono_class_get_image = new NativeFunction(mono_class_get_imagePtr, 'pointer'
 
 var mono_class_is_genericPtr = Module.findExportByName(coreLibraryName, 'il2cpp_class_is_generic');
 var mono_class_is_generic = new NativeFunction(mono_class_is_genericPtr, 'bool', ['pointer']);
+
+var mono_class_is_valuetypePtr = null;
+var mono_class_is_valuetype = null;
+try {
+  mono_class_is_valuetypePtr = Module.findExportByName(
+    coreLibraryName,
+    'il2cpp_class_is_valuetype'
+  );
+} catch (e) {
+  mono_class_is_valuetype = new NativeFunction(mono_class_is_valuetypePtr, 'int', ['pointer']);
+}
 
 var mono_class_vtablePtr = Module.findExportByName(coreLibraryName, 'il2cpp_class_vtable');
 var mono_class_from_mono_typePtr = Module.findExportByName(
@@ -212,12 +231,8 @@ var mono_method_get_param_namesPtr = Module.findExportByName(
   'il2cpp_method_get_param_names'
 );
 
-
-var mono_method_get_flagsPtr = Module.findExportByName(
-  coreLibraryName,
-  'il2cpp_method_get_flags'
-);
-var mono_method_get_flags = new NativeFunction(mono_method_get_flagsPtr, 'int', ['pointer','int']);
+var mono_method_get_flagsPtr = Module.findExportByName(coreLibraryName, 'il2cpp_method_get_flags');
+var mono_method_get_flags = new NativeFunction(mono_method_get_flagsPtr, 'int', ['pointer', 'int']);
 
 var mono_signature_get_descPtr = Module.findExportByName(
   coreLibraryName,
@@ -399,7 +414,7 @@ var il2cpp_method_get_return_type = new NativeFunction(
 var il2cpp_class_from_typePtr = Module.findExportByName(coreLibraryName, 'il2cpp_class_from_type');
 var il2cpp_string_charsPtr = Module.findExportByName(coreLibraryName, 'il2cpp_string_chars');
 
-//var mono_selfthread = mono_thread_attach(mono_domain_get());
+// var mono_selfthread = mono_thread_attach(mono_domain_get());
 
 function InitMono() {
   WriteQword(parseInt(hMono));
@@ -576,6 +591,99 @@ function GetImageName(image) {
   WriteUtf8String(s);
 }
 
+function EnumImages() {
+  var nrofassemblies = Memory.alloc(4);
+  var assemblies = il2cpp_domain_get_assemblies(mono_domain_get(), nrofassemblies);
+  var reply = Memory.alloc(1000000);
+  var reply_pos = 0;
+  for (var i = 0; i < parseInt(nrofassemblies.readU32()); i++) {
+    var p = parseInt(assemblies.add(i * 8).readU64());
+    var image = mono_assembly_get_image(ptr(p));
+    reply.add(reply_pos).writeU64(parseInt(image));
+    reply_pos += 8;
+    var name = mono_image_get_name(image).readUtf8String();
+    var len = name.length;
+    if (len > 512) len = 512;
+    reply.add(reply_pos).writeU16(len);
+    reply_pos += 2;
+    reply.add(reply_pos).writeUtf8String(name);
+    reply_pos += len;
+  }
+  return reply.readByteArray(reply_pos);
+}
+
+function EnumClassesInImagex(image) {
+  var count = il2cpp_image_get_class_count(ptr(image));
+  var reply = Memory.alloc(1000000);
+  var reply_pos = 0;
+  reply.add(reply_pos).writeU32(count);
+  reply_pos += 4;
+  for (var i = 0; i < count; i++) {
+    var c = il2cpp_image_get_class(ptr(image), i);
+    reply.add(reply_pos).writeU64(parseInt(c));
+    reply_pos += 8;
+    if (parseInt(c) != 0) {
+      var parent = mono_class_get_parent(c);
+      reply.add(reply_pos).writeU64(parseInt(parent));
+      reply_pos += 8;
+      var nestingtype = 0;
+      reply.add(reply_pos).writeU64(parseInt(nestingtype));
+      reply_pos += 8;
+      var name = mono_class_get_name(c).readUtf8String();
+      var sl = name.length;
+      reply.add(reply_pos).writeU16(sl);
+      reply_pos += 2;
+      reply.add(reply_pos).writeUtf8String(name);
+      reply_pos += sl;
+      var ns = mono_class_get_namespace(c).readUtf8String();
+      sl = ns.length;
+      reply.add(reply_pos).writeU16(sl);
+      reply_pos += 2;
+      reply.add(reply_pos).writeUtf8String(ns);
+      reply_pos += sl;
+      var fullname = GetFullTypeNameStr(c, 1, MONO_TYPE_NAME_FORMAT_REFLECTION);
+      sl = fullname.length;
+      reply.add(reply_pos).writeU16(sl);
+      reply_pos += 2;
+      reply.add(reply_pos).writeUtf8String(fullname);
+      reply_pos += sl;
+    } else {
+      reply_pos += 22;
+    }
+  }
+  return reply.readByteArray(reply_pos);
+}
+
+function GetFullTypeNameStr(klass, isKlass, nameformat) {
+  var ptype = mono_class_get_type(ptr(klass));
+  if (parseInt(ptype) != 0) {
+    try {
+      var fullname = il2cpp_type_get_name(ptype);
+      return fullname.readUtf8String();
+    } catch (e) {
+      console.log(e);
+      return 'exception';
+    }
+  } else {
+    return '<invalid ptype>';
+  }
+}
+
+function GetFieldClass(field) {
+  var type = field ? mono_field_get_type(ptr(field)) : 0;
+  var klass = type ? mono_class_from_type(type) : 0;
+  WriteQword(parseInt(klass));
+}
+
+function IsValueTypeClass(klass) {
+  if (mono_class_is_valuetype != null) {
+    var flag = mono_class_is_valuetype(ptr(klass));
+    WriteByte(flag);
+  } else {
+    WriteByte(0);
+  }
+}
+
 rpc.exports = {
   initmono: function () {
     InitMono();
@@ -635,6 +743,18 @@ rpc.exports = {
   },
   compilemethod: function (method) {
     return parseInt(ptr(method).readU64());
+  },
+  enumimages: function () {
+    return EnumImages();
+  },
+  enumclassesinimageex: function (image) {
+    return EnumClassesInImagex(image);
+  },
+  getfieldclass: function (field) {
+    GetFieldClass(field);
+  },
+  isvaluetypeclass: function (klass) {
+    return IsValueTypeClass(klass);
   },
   getinfo: function () {
     var pid = Process.id;
