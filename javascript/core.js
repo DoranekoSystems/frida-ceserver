@@ -417,7 +417,7 @@ rpc.exports = {
     }
   },
   enummodules: function () {
-    var moduleList =  Process.enumerateModules();
+    var moduleList = Process.enumerateModules();
     if (java_dissect) {
       moduleList.push({ base: '0xcececece', size: 0, name: 'jvm.dll' });
       moduleList.push({ base: '0xecececec', size: 0, name: 'CEJVMTI.dll' });
@@ -554,7 +554,7 @@ rpc.exports = {
       var type = symbols[i].type;
       var name = symbols[i].name;
       //for speedhack
-      if (Process.platform == 'linux') {
+      if (Process.platform == 'linux' || Process.platform == 'darwin') {
         if (name.indexOf('clock_gettime') != -1) {
           name = name.replace('clock_gettime', '___clock_gettime');
         } else if (name.indexOf('gettimeofday') != -1) {
