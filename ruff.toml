@@ -1,0 +1,6 @@
+[lint]
+select =  ["N", "E", "W", "F", "I"]
+ignore = []
+
+[lint.mccabe]
+max-complexity = 4

@@ -1,13 +1,15 @@
-import frida
+import os
+import platform
+import sys
 import threading
 import time
-import sys
-import ceserver as ce
-import platform
+
+import frida
 import toml
-from define import OS, MODE
+
+import ceserver as ce
 from automation import ADBAutomation, SSHAutomation
-import os
+from define import MODE, OS
 
 hostos = platform.system()
 if hostos == "Windows":
@@ -43,15 +45,15 @@ def get_device():
 
 
 def main(package, pid=None, run_mode=None, memory_address=None):
-    targetOS = config["general"]["targetOS"]
+    target_os = config["general"]["target_os"]
     mode = config["general"]["mode"]
-    javaDissect = config["extended_function"]["javaDissect"]
+    java_dissect = config["extended_function"]["java_dissect"]
     frida_server_ip = config["ipconfig"]["frida_server_ip"]
     binary_path = config["general"]["binary_path"]
 
     adb_auto = config["adb_auto"]
     if run_mode != "memoryview":
-        if adb_auto["enable"] and targetOS == OS.ANDROID.value:
+        if adb_auto["enable"] and target_os == OS.ANDROID.value:
             adbauto = ADBAutomation(adb_auto)
             if adb_auto["ceserver_path"] != "":
                 t1 = threading.Thread(target=adbauto.exec_ceserver)
@@ -65,7 +67,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
             time.sleep(1)
 
         ssh_auto = config["ssh_auto"]
-        if ssh_auto["enable"] and targetOS == OS.IOS.value:
+        if ssh_auto["enable"] and target_os == OS.IOS.value:
             sshauto = SSHAutomation(ssh_auto)
             if ssh_auto["ceserver_path"] != "":
                 t1 = threading.Thread(target=sshauto.exec_ceserver)
@@ -75,7 +77,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
                 t2.start()
             time.sleep(1)
 
-    if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+    if target_os in [OS.ANDROID.value, OS.IOS.value]:
         if frida_server_ip != "":
             device = frida.get_device_manager().add_remote_device(frida_server_ip)
         else:
@@ -123,7 +125,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
     def on_message(message, data):
         print(message)
 
-    if targetOS == OS.WINDOWS.value:
+    if target_os == OS.WINDOWS.value:
         with open("javascript/core_win.js", "r") as f:
             jscode = f.read()
     else:
@@ -140,7 +142,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
         memory_view_mode(api, memory_address)
         return
     symbol_api = 0
-    if targetOS != OS.WINDOWS.value:
+    if target_os != OS.WINDOWS.value:
         script2 = session.create_script(jscode2)
         script2.on("message", on_message)
         script2.load()
@@ -148,8 +150,8 @@ def main(package, pid=None, run_mode=None, memory_address=None):
     if mode == MODE.ATTACH.value:
         info = api.GetInfo()
         process_id = info["pid"]
-    if javaDissect:
-        if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+    if java_dissect:
+        if target_os in [OS.ANDROID.value, OS.IOS.value]:
             print("javaDissect Enabled")
             import java_pipeserver as javapipe
 
@@ -176,7 +178,7 @@ if __name__ == "__main__":
     else:
         config = config["frida"]
         target = config["general"]["target"]
-        targetOS = config["general"]["targetOS"]
+        target_os = config["general"]["target_os"]
         binary_path = config["general"]["binary_path"]
         if "--memoryview" in args:
             memory_address = int(args[args.index("--memoryview") + 1], 16)
@@ -184,7 +186,7 @@ if __name__ == "__main__":
             pid = int(args[2])
             main(None, pid, run_mode, memory_address)
         else:
-            if targetOS in [OS.ANDROID.value, OS.IOS.value]:
+            if target_os in [OS.ANDROID.value, OS.IOS.value]:
                 if target == "":
                     if args[1] == "-p" or args[1] == "--pid":
                         pid = int(args[2])

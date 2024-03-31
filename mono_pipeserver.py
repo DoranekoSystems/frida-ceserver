@@ -1,5 +1,5 @@
-from struct import pack, unpack
 from enum import IntEnum
+from struct import pack, unpack
 
 WriteByte = 1
 WriteWord = 2
@@ -89,58 +89,58 @@ class BinaryReader:
         self.index = 0
         self.read_message = b""
 
-    def ReadInt8(self):
+    def read_int8(self):
         result = self.read_message[self.index : self.index + 1]
         ret = unpack("<b", result)[0]
         self.read_message = self.read_message[self.index + 1 :]
         return ret
 
-    def ReadInt16(self):
+    def read_int16(self):
         result = self.read_message[self.index : self.index + 2]
         ret = unpack("<h", result)[0]
         self.read_message = self.read_message[self.index + 2 :]
         return ret
 
-    def ReadInt32(self):
+    def read_int32(self):
         result = self.read_message[self.index : self.index + 4]
         ret = unpack("<i", result)[0]
         self.read_message = self.read_message[self.index + 4 :]
         return ret
 
-    def ReadInt64(self):
+    def read_int64(self):
         result = self.read_message[self.index : self.index + 8]
         ret = unpack("<q", result)[0]
         self.read_message = self.read_message[self.index + 8 :]
         return ret
 
-    def ReadUInt8(self):
+    def read_uint8(self):
         result = self.read_message[self.index : self.index + 1]
         ret = unpack("<B", result)[0]
         self.read_message = self.read_message[self.index + 1 :]
         return ret
 
-    def ReadUInt16(self):
+    def read_uint16(self):
         result = self.read_message[self.index : self.index + 2]
         ret = unpack("<H", result)[0]
         self.read_message = self.read_message[self.index + 2 :]
         return ret
 
-    def ReadUInt32(self):
+    def read_uint32(self):
         result = self.read_message[self.index : self.index + 4]
         ret = unpack("<I", result)[0]
         self.read_message = self.read_message[self.index + 4 :]
         return ret
 
-    def ReadUInt64(self):
+    def read_uint64(self):
         result = self.read_message[self.index : self.index + 8]
         ret = unpack("<Q", result)[0]
         self.read_message = self.read_message[self.index + 8 :]
         return ret
 
-    def GetMessageSize(self):
+    def get_message_size(self):
         return len(self.read_message)
 
-    def WriteMessage(self, message):
+    def write_message(self, message):
         self.read_message += message
 
 
@@ -148,50 +148,50 @@ class BinaryWriter:
     def __init__(self):
         self.write_message = b""
 
-    def WriteInt8(self, number):
+    def write_int8(self, number):
         i8 = pack("<b", number)
         self.write_message += i8
 
-    def WriteInt16(self, number):
+    def write_int16(self, number):
         i16 = pack("<h", number)
         self.write_message += i16
 
-    def WriteInt32(self, number):
+    def write_int32(self, number):
         i32 = pack("<i", number)
         self.write_message += i32
 
-    def WriteInt64(self, number):
+    def write_int64(self, number):
         i64 = pack("<q", number)
         self.write_message += i64
 
-    def WriteUInt8(self, number):
+    def write_uint8(self, number):
         ui8 = pack("<B", number)
         self.write_message += ui8
 
-    def WriteUInt16(self, number):
+    def write_uint16(self, number):
         ui16 = pack("<H", number)
         self.write_message += ui16
 
-    def WriteUInt32(self, number):
+    def write_uint32(self, number):
         ui32 = pack("<I", number)
         self.write_message += ui32
 
-    def WriteUInt64(self, number):
+    def write_uint64(self, number):
         ui64 = pack("<Q", number)
         self.write_message += ui64
 
-    def WriteUtf8String(self, message):
+    def write_utf8_string(self, message):
         self.write_message += message.encode()
 
-    def WriteByteArray(self, message):
+    def write_byte_array(self, message):
         self.write_message += message
 
-    def ReadMessage(self, size):
+    def read_message(self, size):
         ret = self.write_message[0:size]
         self.write_message = self.write_message[size:]
         return ret
 
-    def GetMessageSize(self):
+    def get_message_size(self):
         return len(self.write_message)
 
 
@@ -210,110 +210,110 @@ def handler(command):
         API.EnumAssemblies()
     elif command == CEPIPECMD.MONOCMD_GETIMAGEFROMASSEMBLY:
         yield 0
-        assembly = READER.ReadUInt64()
+        assembly = READER.read_uint64()
         API.GetImageFromAssembly(assembly)
     elif command == CEPIPECMD.MONOCMD_GETIMAGENAME:
         yield 0
-        image = READER.ReadUInt64()
+        image = READER.read_uint64()
         API.GetImageName(image)
     elif command == CEPIPECMD.MONOCMD_ENUMCLASSESINIMAGE:
         yield 0
-        image = READER.ReadUInt64()
+        image = READER.read_uint64()
         if image == 0:
-            WRITER.WriteUInt32(0)
+            WRITER.write_uint32(0)
         API.EnumClassesInImage(image)
     elif command == CEPIPECMD.MONOCMD_ENUMDOMAINS:
-        WRITER.WriteUInt32(1)
+        WRITER.write_uint32(1)
         domain = API.EnumDomains()
-        WRITER.WriteUInt64(domain)
+        WRITER.write_uint64(domain)
     elif command == CEPIPECMD.MONOCMD_ENUMMETHODSINCLASS:
         yield 0
-        _class = READER.ReadUInt64()
+        _class = READER.read_uint64()
         API.EnumMethodsInClass(_class)
     elif command == CEPIPECMD.MONOCMD_GETCLASSNESTINGTYPE:
         yield 0
-        klass = READER.ReadUInt64()
-        WRITER.WriteUInt64(0)
+        klass = READER.read_uint64()
+        WRITER.write_uint64(0)
     elif command == CEPIPECMD.MONOCMD_GETFULLTYPENAME:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         yield 0
-        isKlass = READER.ReadUInt8()
+        is_klass = READER.read_uint8()
         yield 0
-        nameformat = READER.ReadUInt32()
-        API.GetFullTypeName(klass, isKlass, nameformat)
+        nameformat = READER.read_uint32()
+        API.GetFullTypeName(klass, is_klass, nameformat)
     elif command == CEPIPECMD.MONOCMD_GETPARENTCLASS:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.GetParentClass(klass)
     elif command == CEPIPECMD.MONOCMD_GETCLASSNAME:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.GetClassName(klass)
     elif command == CEPIPECMD.MONOCMD_GETCLASSNAMESPACE:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.GetClassNameSpace(klass)
     elif command == CEPIPECMD.MONOCMD_GETCLASSIMAGE:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.GetClassImage(klass)
     elif command == CEPIPECMD.MONOCMD_ISCLASSGENERIC:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.IsClassGeneric(klass)
     elif command == CEPIPECMD.MONOCMD_GETSTATICFIELDADDRESSFROMCLASS:
         yield 0
-        domain = READER.ReadUInt64()
+        domain = READER.read_uint64()
         yield 0
-        klass = READER.ReadUInt64()
-        WRITER.WriteUInt64(0)
+        klass = READER.read_uint64()
+        WRITER.write_uint64(0)
     elif command == CEPIPECMD.MONOCMD_ENUMFIELDSINCLASS:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.EnumFieldsInClass(klass)
     elif command == CEPIPECMD.MONOCMD_GETMETHODSIGNATURE:
         yield 0
-        method = READER.ReadUInt64()
+        method = READER.read_uint64()
         API.GetMethodSignature(method)
     elif command == CEPIPECMD.MONOCMD_GETSTATICFIELDVALUE:
         yield 0
-        vtable = READER.ReadUInt64()
+        vtable = READER.read_uint64()
         yield 0
-        field = READER.ReadUInt64()
+        field = READER.read_uint64()
         API.GetStaticFieldValue(vtable, field)
     elif command == CEPIPECMD.MONOCMD_SETSTATICFIELDVALUE:
         yield 0
-        vtable = READER.ReadUInt64()
+        vtable = READER.read_uint64()
         yield 0
-        field = READER.ReadUInt64()
+        field = READER.read_uint64()
         yield 0
-        val = READER.ReadUInt64()
+        val = READER.read_uint64()
         API.SetStaticFieldValue(vtable, field, val)
     elif command == CEPIPECMD.MONOCMD_COMPILEMETHOD:
         yield 0
-        method = READER.ReadUInt64()
-        methodPtr = API.CompileMethod(method)
-        WRITER.WriteUInt64(methodPtr)
+        method = READER.read_uint64()
+        method_ptr = API.CompileMethod(method)
+        WRITER.write_uint64(method_ptr)
     elif command == CEPIPECMD.MONOCMD_GETMONODATACOLLECTORVERSION:
-        WRITER.WriteUInt32(MONO_DATACOLLECTORVERSION)
+        WRITER.write_uint32(MONO_DATACOLLECTORVERSION)
     elif command == CEPIPECMD.MONOCMD_ENUMIMAGES:
         data = API.EnumImages()
-        WRITER.WriteUInt32(len(data))
-        WRITER.WriteByteArray(data)
+        WRITER.write_uint32(len(data))
+        WRITER.write_byte_array(data)
     elif command == CEPIPECMD.MONOCMD_ENUMCLASSESINIMAGEEX:
         yield 0
-        image = READER.ReadUInt64()
+        image = READER.read_uint64()
         data = API.EnumClassesInImageEX(image)
-        WRITER.WriteUInt32(len(data))
-        WRITER.WriteByteArray(data)
+        WRITER.write_uint32(len(data))
+        WRITER.write_byte_array(data)
     elif command == CEPIPECMD.MONOCMD_GETFIELDCLASS:
         yield 0
-        field = READER.ReadUInt64()
+        field = READER.read_uint64()
         API.GetFieldClass(field)
     elif command == CEPIPECMD.MONOCMD_ISCLASSVALUETYPE:
         yield 0
-        klass = READER.ReadUInt64()
+        klass = READER.read_uint64()
         API.IsValueTypeClass(klass)
     else:
         pass
@@ -327,12 +327,12 @@ HANDLER = 0
 def mono_process(buf):
     global IS_COMMAND
     global HANDLER
-    READER.WriteMessage(buf)
-    while READER.GetMessageSize() > 0:
+    READER.write_message(buf)
+    while READER.get_message_size() > 0:
         if IS_COMMAND:
             try:
                 IS_COMMAND = False
-                command = READER.ReadUInt8()
+                command = READER.read_uint8()
                 HANDLER = handler(command)
                 ret = HANDLER.__next__()
                 if ret == 1:
@@ -363,15 +363,15 @@ def on_message(message, data):
         _type = message["payload"][0]
         value = message["payload"][1]
         if _type == WriteByte:
-            WRITER.WriteUInt8(value)
+            WRITER.write_uint8(value)
         elif _type == WriteWord:
-            WRITER.WriteUInt16(value)
+            WRITER.write_uint16(value)
         elif _type == WriteDword:
-            WRITER.WriteUInt32(value)
+            WRITER.write_uint32(value)
         elif _type == WriteQword:
-            WRITER.WriteUInt64(value)
+            WRITER.write_uint64(value)
         elif _type == WriteUtf8String:
-            WRITER.WriteUtf8String(value)
+            WRITER.write_utf8_string(value)
         elif _type == DecodeObject:
             pass
             # SCRIPT.post({"type": "input", "payload": decode(value)})

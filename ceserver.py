@@ -1,22 +1,24 @@
-import socket
-from struct import pack, unpack
-import zlib
-import time
-import json
-from enum import IntEnum
-import threading
-import random
-import platform
-import subprocess
 import bisect
-from packaging.version import parse
 import importlib.util
+import json
+import os
+import platform
+import queue
+import random
+import socket
+import subprocess
+import threading
+import time
+import zlib
+from enum import IntEnum
+from struct import pack, unpack
+
+import lz4.block
+from packaging.version import parse
+
 import mono_pipeserver
 from define import OS
 from lldbauto import LLDBAutomation
-import lz4.block
-import queue
-import os
 
 PID = 0
 API = 0
@@ -87,14 +89,14 @@ ModuleList = None
 ModuleListIterator = 0
 
 
-def ProtectionStringToType(protectionstring):
+def protection_string_to_type(protectionstring):
     if protectionstring.find("s") != -1:
         return MEM_MAPPED
     else:
         return MEM_PRIVATE
 
 
-def ProtectionStringToProtection(protectionstring):
+def protection_string_to_protection(protectionstring):
     w = 0
     x = 0
 
@@ -126,22 +128,22 @@ def virtualqueryex(address):
     global RegionList
     if RegionList is None:
         RegionList = API.VirtualQueryExFull(VQE_NOSHARED)
-    lpAddress = address
+    lp_address = address
     sorts = [region[0] + region[1] for region in RegionList]
-    index = bisect.bisect_left(sorts, lpAddress + 1)
+    index = bisect.bisect_left(sorts, lp_address + 1)
     if index == len(sorts):
         return False
     start = int(RegionList[index][0])
-    if start <= lpAddress:
-        base = lpAddress
+    if start <= lp_address:
+        base = lp_address
         size = RegionList[index][1]
         protection = RegionList[index][2]
         _type = RegionList[index][3]
         filename = RegionList[index][4]
         return [base, size, protection, _type, filename]
     else:
-        base = lpAddress
-        size = start - lpAddress
+        base = lp_address
+        size = start - lp_address
         protection = PAGE_NOACCESS
         _type = 0
         filename = ""
@@ -240,48 +242,48 @@ class BinaryReader:
     def __init__(self, base):
         self.base = base
 
-    def ReadInt8(self):
+    def read_int8(self):
         result = recvall(self.base, 1)
         ret = unpack("<b", result)[0]
         return ret
 
-    def ReadInt16(self):
+    def read_int16(self):
         result = recvall(self.base, 2)
         ret = unpack("<h", result)[0]
         return ret
 
-    def ReadInt32(self):
+    def read_int32(self):
         result = recvall(self.base, 4)
         ret = unpack("<i", result)[0]
         return ret
 
-    def ReadInt64(self):
+    def read_int64(self):
         result = recvall(self.base, 8)
         ret = unpack("<q", result)[0]
         return ret
 
-    def ReadUInt8(self):
+    def read_uint8(self):
         result = recvall(self.base, 1)
         ret = unpack("<B", result)[0]
         return ret
 
-    def ReadUInt16(self):
+    def read_uint16(self):
         result = recvall(self.base, 2)
         ret = unpack("<H", result)[0]
         return ret
 
-    def ReadUInt32(self):
+    def read_uint32(self):
         result = recvall(self.base, 4)
         ret = unpack("<I", result)[0]
         return ret
 
-    def ReadUInt64(self):
+    def read_uint64(self):
         result = recvall(self.base, 8)
         ret = unpack("<Q", result)[0]
         return ret
 
-    def ReadString16(self):
-        length = self.ReadUInt16()
+    def read_string16(self):
+        length = self.read_uint16()
         result = recvall(self.base, length)
         ret = result.decode()
         return ret
@@ -291,40 +293,40 @@ class BinaryWriter:
     def __init__(self, base):
         self.base = base
 
-    def WriteInt8(self, number):
+    def write_int8(self, number):
         i8 = pack("<b", number)
         self.base.sendall(i8)
 
-    def WriteInt16(self, number):
+    def write_int16(self, number):
         i16 = pack("<h", number)
         self.base.sendall(i16)
 
-    def WriteInt32(self, number):
+    def write_int32(self, number):
         i32 = pack("<i", number)
         self.base.sendall(i32)
 
-    def WriteInt64(self, number):
+    def write_int64(self, number):
         i64 = pack("<q", number)
         self.base.sendall(i64)
 
-    def WriteUInt8(self, number):
+    def write_uint8(self, number):
         ui8 = pack("<B", number)
         self.base.sendall(ui8)
 
-    def WriteUInt16(self, number):
+    def write_uint16(self, number):
         ui16 = pack("<H", number)
         self.base.sendall(ui16)
 
-    def WriteUInt32(self, number):
+    def write_uint32(self, number):
         ui32 = pack("<I", number)
         self.base.sendall(ui32)
 
-    def WriteUInt64(self, number):
+    def write_uint64(self, number):
         ui64 = pack("<Q", number)
         self.base.sendall(ui64)
 
 
-def GetSymbolListFromFile(filename, output):
+def get_symbollist_from_file(filename, output):
     if TARGETOS in [OS.LINUX.value, OS.ANDROID.value] and MANUAL_PARSER:
         ret = SYMBOL_API.GetSymbolListFromFile(filename)
     else:
@@ -334,17 +336,17 @@ def GetSymbolListFromFile(filename, output):
             if symbolfile == filename:
                 with open(filepath, encoding="utf-8") as f:
                     jdict = json.loads(f.read().replace("\n", ""))
-                    ScriptMethod = sorted(
+                    script_method = sorted(
                         jdict["ScriptMethod"], key=lambda x: x["Address"]
                     )
-                    for i, method in enumerate(ScriptMethod):
+                    for i, method in enumerate(script_method):
                         baseaddress = method["Address"]
-                        if i == len(ScriptMethod) - 1:
+                        if i == len(script_method) - 1:
                             size = 8
                         else:
                             size = (
-                                ScriptMethod[i + 1]["Address"]
-                                - ScriptMethod[i]["Address"]
+                                script_method[i + 1]["Address"]
+                                - script_method[i]["Address"]
                             )
                         _type = 0
                         name = method["Name"]
@@ -543,7 +545,7 @@ def debugger_thread():
 script_dict = {}
 
 
-def load_frida_script(jscode, numberStr, filename=""):
+def load_frida_script(jscode, number_str, filename=""):
     global script_dict
     session = SESSION
     script = session.create_script(jscode)
@@ -560,14 +562,14 @@ def load_frida_script(jscode, numberStr, filename=""):
 
         script.on("message", on_message)
     script.load()
-    script_dict[numberStr] = script
+    script_dict[number_str] = script
 
 
-def unload_frida_script(numberStr):
+def unload_frida_script(number_str):
     global script_dict
-    script = script_dict[numberStr]
+    script = script_dict[number_str]
     script.unload()
-    script_dict.pop(numberStr)
+    script_dict.pop(number_str)
 
 
 def handler(ns, nc, command, thread_count):
@@ -584,16 +586,16 @@ def handler(ns, nc, command, thread_count):
 
     # print(str(thread_count) + ":" + str(CECMD(command).name))
     if command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT:
-        dwFlags = reader.ReadInt32()
-        pid = reader.ReadInt32()
-        hSnapshot = random.randint(1, 0x10000)
-        writer.WriteInt32(hSnapshot)
+        dw_flags = reader.read_int32()
+        pid = reader.read_int32()
+        h_snapshot = random.randint(1, 0x10000)
+        writer.write_int32(h_snapshot)
 
     elif command == CECMD.CMD_CREATETOOLHELP32SNAPSHOTEX:
-        dwFlags = reader.ReadInt32()
-        pid = reader.ReadInt32()
+        dw_flags = reader.read_int32()
+        pid = reader.read_int32()
         bytecode = b""
-        if dwFlags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
+        if dw_flags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
             ret = module32first()
             while True:
                 if ret:
@@ -633,18 +635,18 @@ def handler(ns, nc, command, thread_count):
                 tmp = pack("<iQIII", 0, 0, 0, 0, 0)
             bytecode = b"".join([bytecode, tmp])
             ns.sendall(bytecode)
-        elif dwFlags & TH32CS_SNAPTHREAD == TH32CS_SNAPTHREAD:
+        elif dw_flags & TH32CS_SNAPTHREAD == TH32CS_SNAPTHREAD:
             idlist = API.GetThreadList()
-            writer.WriteInt32(len(idlist))
+            writer.write_int32(len(idlist))
             for id in idlist:
-                writer.WriteInt32(id)
+                writer.write_int32(id)
         else:
-            hSnapshot = random.randint(1, 0x10000)
-            writer.WriteInt32(hSnapshot)
+            h_snapshot = random.randint(1, 0x10000)
+            writer.write_int32(h_snapshot)
 
     elif command == CECMD.CMD_PROCESS32FIRST or command == CECMD.CMD_PROCESS32NEXT:
-        hSnapshot = reader.ReadInt32()
-        print("hSnapshot:" + str(hSnapshot))
+        h_snapshot = reader.read_int32()
+        print("hSnapshot:" + str(h_snapshot))
         if command == CECMD.CMD_PROCESS32FIRST:
             ret = 1
         else:
@@ -666,7 +668,7 @@ def handler(ns, nc, command, thread_count):
             ns.sendall(bytecode)
 
     elif command == CECMD.CMD_MODULE32FIRST or command == CECMD.CMD_MODULE32NEXT:
-        hSnapshot = reader.ReadInt32()
+        h_snapshot = reader.read_int32()
         if command == CECMD.CMD_MODULE32FIRST:
             ret = module32first()
         else:
@@ -716,44 +718,44 @@ def handler(ns, nc, command, thread_count):
             ns.sendall(bytecode)
 
     elif command == CECMD.CMD_CLOSEHANDLE:
-        reader.ReadInt32()
+        reader.read_int32()
         # CloseHandle(h)
-        writer.WriteInt32(1)
+        writer.write_int32(1)
 
     elif command == CECMD.CMD_OPENPROCESS:
-        pid = reader.ReadInt32()
+        pid = reader.read_int32()
         if nc != 0:
-            writer2.WriteUInt8(CECMD.CMD_OPENPROCESS)
-            writer2.WriteInt32(pid)
-            processhandle = reader2.ReadInt32()
+            writer2.write_uint8(CECMD.CMD_OPENPROCESS)
+            writer2.write_int32(pid)
+            processhandle = reader2.read_int32()
         else:
             processhandle = random.randint(0, 0x10000)
         print("Processhandle:" + str(processhandle))
-        writer.WriteInt32(processhandle)
+        writer.write_int32(processhandle)
 
     elif command == CECMD.CMD_GETARCHITECTURE:
         if parse(CEVERSION) >= parse("7.4.1"):
-            handle = reader.ReadInt32()
+            handle = reader.read_int32()
         arch = ARCH
-        writer.WriteInt8(arch)
+        writer.write_int8(arch)
 
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
-        size = reader.ReadInt32()
+        size = reader.read_int32()
         ns.recv(size)
 
     elif command == CECMD.CMD_READPROCESSMEMORY:
-        handle = reader.ReadUInt32()
-        address = reader.ReadUInt64()
-        size = reader.ReadUInt32()
-        compress = reader.ReadInt8()
+        handle = reader.read_uint32()
+        address = reader.read_uint64()
+        size = reader.read_uint32()
+        compress = reader.read_int8()
         if nc != 0:
-            writer2.WriteUInt8(CECMD.CMD_READPROCESSMEMORY)
-            writer2.WriteUInt32(handle)
-            writer2.WriteUInt64(address)
-            writer2.WriteUInt32(size)
-            writer2.WriteInt8(compress)
+            writer2.write_uint8(CECMD.CMD_READPROCESSMEMORY)
+            writer2.write_uint32(handle)
+            writer2.write_uint64(address)
+            writer2.write_uint32(size)
+            writer2.write_int8(compress)
             if compress == 0:
-                read = reader2.ReadUInt32()
+                read = reader2.read_uint32()
                 if read == 0:
                     ret = False
                 else:
@@ -763,15 +765,15 @@ def handler(ns, nc, command, thread_count):
                         if len(ret) == read:
                             break
             else:
-                uncompressedSize = reader2.ReadUInt32()
-                compressedSize = reader2.ReadUInt32()
-                if compressedSize == 0:
+                uncompressed_size = reader2.read_uint32()
+                compressed_size = reader2.read_uint32()
+                if compressed_size == 0:
                     ret = False
                 else:
                     ret = b""
                     while True:
                         ret += nc.recv(4096)
-                        if len(ret) == compressedSize:
+                        if len(ret) == compressed_size:
                             break
         else:
             ret = API.ReadProcessMemory(address, size)
@@ -800,28 +802,28 @@ def handler(ns, nc, command, thread_count):
                     uncompressed_size = unpack("<I", ret[-4:])[0]
                     decompress_bytes = lz4.block.decompress(ret[:-4], uncompressed_size)
                     ret = decompress_bytes
-                writer.WriteInt32(len(ret))
+                writer.write_int32(len(ret))
                 ns.sendall(ret)
             else:
-                writer.WriteInt32(0)
+                writer.write_int32(0)
         else:
             if ret:
                 if nc != 0:
                     compress_data = ret
                 else:
-                    uncompressedSize = len(ret)
+                    uncompressed_size = len(ret)
                     compress_data = zlib.compress(ret, level=compress)
-                writer.WriteInt32(uncompressedSize)
-                writer.WriteInt32(len(compress_data))
+                writer.write_int32(uncompressed_size)
+                writer.write_int32(len(compress_data))
                 ns.sendall(compress_data)
             else:
-                writer.WriteInt32(0)
-                writer.WriteInt32(0)
+                writer.write_int32(0)
+                writer.write_int32(0)
 
     elif command == CECMD.CMD_WRITEPROCESSMEMORY:
-        handle = reader.ReadUInt32()
-        address = reader.ReadUInt64()
-        size = reader.ReadUInt32()
+        handle = reader.read_uint32()
+        address = reader.read_uint64()
+        size = reader.read_uint32()
         if size > 0:
             _buf = ns.recv(size)
             # extended functionality
@@ -877,36 +879,36 @@ def handler(ns, nc, command, thread_count):
                     else:
                         ret = API.WriteProcessMemory(address, list(_buf))
             if ret:
-                writer.WriteInt32(size)
+                writer.write_int32(size)
             else:
-                writer.WriteInt32(0)
+                writer.write_int32(0)
         else:
-            writer.WriteInt32(0)
+            writer.write_int32(0)
 
     elif command == CECMD.CMD_VIRTUALQUERYEXFULL:
-        handle = reader.ReadInt32()
-        flags = reader.ReadInt8()
+        handle = reader.read_int32()
+        flags = reader.read_int8()
         address = 0
-        sendbyteCode = b""
-        regionSize = 0
+        sendbyte_code = b""
+        region_size = 0
         if IS_STOPPED:
             ret = RegionList
         else:
             ret = API.VirtualQueryExFull(flags)
-        regionSize = len(ret)
+        region_size = len(ret)
         for ri in ret:
             protection = ri[2]
             baseaddress = ri[0]
             _type = ri[3]
             size = ri[1]
             bytecode = pack("<QQII", baseaddress, size, protection, _type)
-            sendbyteCode += bytecode
-        writer.WriteInt32(regionSize)
-        ns.sendall(sendbyteCode)
+            sendbyte_code += bytecode
+        writer.write_int32(region_size)
+        ns.sendall(sendbyte_code)
 
     elif command == CECMD.CMD_VIRTUALQUERYEX:
-        handle = reader.ReadInt32()
-        baseaddress = reader.ReadUInt64()
+        handle = reader.read_int32()
+        baseaddress = reader.read_uint64()
         ret = virtualqueryex(baseaddress)
         if ret:
             protection = ret[2]
@@ -924,8 +926,8 @@ def handler(ns, nc, command, thread_count):
             ns.sendall(bytecode)
 
     elif command == CECMD.CMD_GETREGIONINFO:
-        handle = reader.ReadInt32()
-        baseaddress = reader.ReadUInt64()
+        handle = reader.read_int32()
+        baseaddress = reader.read_uint64()
         ret = virtualqueryex(baseaddress)
         if ret:
             protection = ret[2]
@@ -936,7 +938,7 @@ def handler(ns, nc, command, thread_count):
             ns.sendall(bytecode)
             filename = ret[4]
             filenamesize = len(filename)
-            writer.WriteUInt8(filenamesize)
+            writer.write_uint8(filenamesize)
             ns.sendall(filename.encode())
         else:
             protection = 0
@@ -945,7 +947,7 @@ def handler(ns, nc, command, thread_count):
             size = 0
             bytecode = pack("<bIIQQ", 0, protection, _type, baseaddress, size)
             ns.sendall(bytecode)
-            writer.WriteInt8(0)
+            writer.write_int8(0)
 
     elif command == CECMD.CMD_TERMINATESERVER:
         ns.close()
@@ -975,66 +977,66 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_GETSYMBOLLISTFROMFILE:
         if parse(CEVERSION) >= parse("7.5.1"):
-            reader.ReadUInt32()
-            symbolpathsize = reader.ReadUInt32()
+            reader.read_uint32()
+            symbolpathsize = reader.read_uint32()
             symbolname = ns.recv(symbolpathsize).decode()
             output = [0]
-            GetSymbolListFromFile(symbolname, output)
+            get_symbollist_from_file(symbolname, output)
         else:
-            symbolpathsize = reader.ReadInt16()
+            symbolpathsize = reader.read_int16()
             symbolname = ns.recv(symbolpathsize + 2).decode()
             output = [0]
-            GetSymbolListFromFile(symbolname[2:], output)
+            get_symbollist_from_file(symbolname[2:], output)
         ns.sendall(output[0])
 
     elif command == CECMD.CMD_LOADEXTENSION:
-        handle = reader.ReadInt32()
-        writer.WriteInt32(1)
+        handle = reader.read_int32()
+        writer.write_int32(1)
 
     elif command == CECMD.CMD_SPEEDHACK_SETSPEED:
-        handle = reader.ReadInt32()
+        handle = reader.read_int32()
         data = ns.recv(4)
         speedratio = unpack("<f", data)[0]
         r = API.ExtSetSpeed(speedratio)
-        writer.WriteInt32(r)
+        writer.write_int32(r)
 
     elif command == CECMD.CMD_ALLOC:
-        handle = reader.ReadInt32()
-        preferedBase = reader.ReadUInt64()
-        size = reader.ReadInt32()
-        address = API.ExtAlloc(preferedBase, size)
-        writer.WriteUInt64(address)
+        handle = reader.read_int32()
+        prefered_base = reader.read_uint64()
+        size = reader.read_int32()
+        address = API.ExtAlloc(prefered_base, size)
+        writer.write_uint64(address)
 
     elif command == CECMD.CMD_FREE:
-        handle = reader.ReadInt32()
-        address = reader.ReadUInt64()
-        size = reader.ReadInt32()
+        handle = reader.read_int32()
+        address = reader.read_uint64()
+        size = reader.read_int32()
         r = API.ExtFree(address, size)
-        writer.WriteInt32(r)
+        writer.write_int32(r)
 
     elif command == CECMD.CMD_LOADMODULE:
-        handle = reader.ReadInt32()
-        modulepathlength = reader.ReadInt32()
+        handle = reader.read_int32()
+        modulepathlength = reader.read_int32()
         modulepath = ns.recv(modulepathlength).decode()
         if modulepath.find("libMonoDataCollector") != -1:
-            writer.WriteUInt64(0x7FFFDEADBEAF)
+            writer.write_uint64(0x7FFFDEADBEAF)
         else:
             r = API.ExtLoadModule(modulepath)
-            writer.WriteUInt64(r)
+            writer.write_uint64(r)
 
     elif command == CECMD.CMD_CREATETHREAD:
-        handle = reader.ReadInt32()
-        startaddress = reader.ReadUInt64()
-        parameter = reader.ReadUInt64()
+        handle = reader.read_int32()
+        startaddress = reader.read_uint64()
+        parameter = reader.read_uint64()
         r = API.ExtCreateThread(startaddress, parameter)
         threadhandle = random.randint(0, 0x10000)
-        writer.WriteInt32(threadhandle)
+        writer.write_int32(threadhandle)
 
     elif command == CECMD.CMD_GETABI:
-        writer.WriteInt8(1)
+        writer.write_int8(1)
 
     elif command == CECMD.CMD_STARTDEBUG:
-        handle = reader.ReadInt32()
+        handle = reader.read_int32()
         target_ip = DEBUGSERVER_IP.split(":")[0]
         target_port = int(DEBUGSERVER_IP.split(":")[1])
 
@@ -1053,53 +1055,53 @@ def handler(ns, nc, command, thread_count):
             "maxSharedBreakpoints": LLDB_REGISTER_COUNT,
         }
         DEBUG_EVENT.append(event)
-        writer.WriteInt32(1)
+        writer.write_int32(1)
 
     elif command == CECMD.CMD_WAITFORDEBUGEVENT:
-        handle = reader.ReadInt32()
-        timeout = reader.ReadInt32()
+        handle = reader.read_int32()
+        timeout = reader.read_int32()
         if len(DEBUG_EVENT) > 0:
-            writer.WriteInt32(1)
+            writer.write_int32(1)
             event = DEBUG_EVENT.pop()
             debugevent = event["debugevent"]
             threadid = event["threadid"]
             if debugevent == -2:
-                writer.WriteInt32(debugevent)
-                writer.WriteInt64(threadid)
-                writer.WriteUInt8(event["maxBreakpointCount"])
-                writer.WriteInt8(event["maxWatchpointCount"])
-                writer.WriteUInt8(event["maxSharedBreakpoints"])
+                writer.write_int32(debugevent)
+                writer.write_int64(threadid)
+                writer.write_uint8(event["maxBreakpointCount"])
+                writer.write_int8(event["maxWatchpointCount"])
+                writer.write_uint8(event["maxSharedBreakpoints"])
                 ns.sendall(b"\x00" * 5)
             elif debugevent == 5:
                 REGISTER_INFO = event["register"]
-                writer.WriteInt32(debugevent)
-                writer.WriteInt64(threadid)
-                writer.WriteUInt64(event["address"])
+                writer.write_int32(debugevent)
+                writer.write_int64(threadid)
+                writer.write_uint64(event["address"])
         else:
             time.sleep(timeout / (1000 * 20))
-            writer.WriteInt32(0)
+            writer.write_int32(0)
 
     elif command == CECMD.CMD_CONTINUEFROMDEBUGEVENT:
-        handle = reader.ReadInt32()
-        tid = reader.ReadInt32()
-        ignore = reader.ReadInt32()
+        handle = reader.read_int32()
+        tid = reader.read_int32()
+        ignore = reader.read_int32()
         CONTINUE_QUEUE.put([ignore, tid])
-        writer.WriteInt32(1)
+        writer.write_int32(1)
 
     elif command == CECMD.CMD_SETBREAKPOINT:
-        handle = reader.ReadInt32()
-        tid = reader.ReadInt32()
-        debugreg = reader.ReadInt32()
-        address = reader.ReadUInt64()
-        bptype = reader.ReadInt32()
-        bpsize = reader.ReadInt32()
+        handle = reader.read_int32()
+        tid = reader.read_int32()
+        debugreg = reader.read_int32()
+        address = reader.read_uint64()
+        bptype = reader.read_int32()
+        bpsize = reader.read_int32()
 
         wp = WP_INFO_LIST[debugreg]
         # auto
         if tid != -1:
             if IS_STOPPED:
                 LLDB.set_watchpoint(address, wp["bpsize"], wp["type"])
-            writer.WriteInt32(1)
+            writer.write_int32(1)
         # manual
         else:
             if not wp["switch"] and not wp["enabled"]:
@@ -1127,20 +1129,20 @@ def handler(ns, nc, command, thread_count):
                     "enabled": enabled,
                 }
                 WP_INFO_LIST[debugreg] = bp
-                writer.WriteInt32(1)
+                writer.write_int32(1)
             else:
-                writer.WriteInt32(0)
+                writer.write_int32(0)
 
     elif command == CECMD.CMD_REMOVEBREAKPOINT:
-        handle = reader.ReadInt32()
-        tid = reader.ReadInt32()
-        debugreg = reader.ReadInt32()
-        reader.ReadInt32()
+        handle = reader.read_int32()
+        tid = reader.read_int32()
+        debugreg = reader.read_int32()
+        reader.read_int32()
         wp = WP_INFO_LIST[debugreg]
         if tid != -1:
             if IS_STOPPED:
                 LLDB.remove_watchpoint(wp["address"], wp["bpsize"], wp["type"])
-            writer.WriteInt32(1)
+            writer.write_int32(1)
         else:
             if wp["switch"] and wp["enabled"]:
                 if IS_STOPPED:
@@ -1152,42 +1154,42 @@ def handler(ns, nc, command, thread_count):
                 else:
                     print("CMD_REMOVEBREAKPOINT")
                 WP_INFO_LIST[debugreg]["switch"] = False
-                writer.WriteInt32(1)
+                writer.write_int32(1)
             else:
-                writer.WriteInt32(0)
+                writer.write_int32(0)
 
     elif command == CECMD.CMD_GETTHREADCONTEXT:
-        handle = reader.ReadInt32()
-        tid = reader.ReadInt32()
+        handle = reader.read_int32()
+        tid = reader.read_int32()
         if parse(CEVERSION) < parse("7.4.2"):
-            _type = reader.ReadInt32()
-        writer.WriteInt32(1)
+            _type = reader.read_int32()
+        writer.write_int32(1)
         if ARCH == 3:
             if parse(CEVERSION) >= parse("7.4.2"):
-                writer.WriteInt32(808)  # structsize
+                writer.write_int32(808)  # structsize
                 ### Context ###
-                writer.WriteInt32(808)  # structsize
-                writer.WriteInt32(3)  # type
+                writer.write_int32(808)  # structsize
+                writer.write_int32(3)  # type
                 if len(REGISTER_INFO) > 0:  # general registers
                     for value in REGISTER_INFO:
-                        writer.WriteUInt64(value)
+                        writer.write_uint64(value)
                 else:
                     ns.sendall(b"\x00" * 8 * 34)
                 ### ContextFP ###
                 ns.sendall(b"\x00" * 16 * 33)
             else:
-                writer.WriteInt32(8 * 34)
+                writer.write_int32(8 * 34)
                 if len(REGISTER_INFO) > 0:
                     for value in REGISTER_INFO:
-                        writer.WriteUInt64(value)
+                        writer.write_uint64(value)
                 else:
                     ns.sendall(b"\x00" * 8 * 34)
 
     elif command == CECMD.CMD_SETTHREADCONTEXT:
         if parse(CEVERSION) >= parse("7.4.2"):
-            handle = reader.ReadInt32()
-            tid = reader.ReadInt32()
-            structsize = reader.ReadInt32()
+            handle = reader.read_int32()
+            tid = reader.read_int32()
+            structsize = reader.read_int32()
             context = ns.recv(structsize)
             for i in range(1, 34):
                 try:
@@ -1199,15 +1201,15 @@ def handler(ns, nc, command, thread_count):
                             REGISTER_INFO[i - 1] = value
                 except Exception:
                     address = 0
-            writer.WriteInt32(1)
+            writer.write_int32(1)
         else:
             print("SETTHREADCONTEXT not support.")
 
     elif command == CECMD.CMD_CHANGEMEMORYPROTECTION:
-        handle = reader.ReadInt32()
-        address = reader.ReadUInt64()
-        size = reader.ReadInt32()
-        windowsprotection = reader.ReadInt32()
+        handle = reader.read_int32()
+        address = reader.read_uint64()
+        size = reader.read_int32()
+        windowsprotection = reader.read_int32()
         newprotectionstr = "---"
         if windowsprotection == PAGE_EXECUTE_READWRITE:
             newprotectionstr = "rwx"
@@ -1224,43 +1226,43 @@ def handler(ns, nc, command, thread_count):
             ret = 1
         else:
             ret = 0
-        writer.WriteInt32(ret)
-        writer.WriteInt32(windowsprotection)
+        writer.write_int32(ret)
+        writer.write_int32(windowsprotection)
 
     elif command == CECMD.CMD_GETOPTIONS:
-        writer.WriteInt16(0)
+        writer.write_int16(0)
 
     elif command == CECMD.CMD_OPENNAMEDPIPE:
-        reader.ReadString16()
-        timeout = reader.ReadUInt32()
+        reader.read_string16()
+        timeout = reader.read_uint32()
         pipehandle = random.randint(1, 0x10000)
-        writer.WriteInt32(pipehandle)
+        writer.write_int32(pipehandle)
 
     elif command == CECMD.CMD_PIPEREAD:
-        pipehandle = reader.ReadUInt32()
-        size = reader.ReadUInt32()
-        timeout = reader.ReadUInt32()
+        pipehandle = reader.read_uint32()
+        size = reader.read_uint32()
+        timeout = reader.read_uint32()
 
         mono_writer = mono_pipeserver.WRITER
-        ret = mono_writer.ReadMessage(size)
-        writer.WriteUInt32(len(ret))
+        ret = mono_writer.read_message(size)
+        writer.write_uint32(len(ret))
         ns.sendall(ret)
 
     elif command == CECMD.CMD_PIPEWRITE:
-        pipehandle = reader.ReadUInt32()
-        size = reader.ReadUInt32()
-        timeout = reader.ReadUInt32()
+        pipehandle = reader.read_uint32()
+        size = reader.read_uint32()
+        timeout = reader.read_uint32()
         buf = ns.recv(size)
 
         mono_pipeserver.mono_process(buf)
-        writer.WriteUInt32(size)
+        writer.write_uint32(size)
 
     elif command == CECMD.CMD_ISANDROID:
-        writer.WriteInt8(1)
+        writer.write_int8(1)
 
     elif command == CECMD.CMD_GETCESERVERPATH:
         path = b"/data/local/tmp/ceserver"
-        writer.WriteInt16(len(path))
+        writer.write_int16(len(path))
         ns.sendall(path)
     else:
         pass
@@ -1312,9 +1314,9 @@ def ceserver(pid, api, symbol_api, config, session):
     ARCH = config["general"]["arch"]
     SESSION = session
     CEVERSION = config["general"]["ceversion"]
-    TARGETOS = config["general"]["targetOS"]
-    MANUAL_PARSER = config["extended_function"]["manualParser"]
-    JAVA_DISSECT = config["extended_function"]["javaDissect"]
+    TARGETOS = config["general"]["target_os"]
+    MANUAL_PARSER = config["extended_function"]["manual_parser"]
+    JAVA_DISSECT = config["extended_function"]["java_dissect"]
     NATIVE_CESERVER_IP = config["ipconfig"]["native_ceserver_ip"]
     CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
     DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]

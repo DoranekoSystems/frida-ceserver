@@ -1,7 +1,8 @@
-from struct import pack, unpack
 from enum import IntEnum
-import win32pipe
+from struct import pack, unpack
+
 import win32file
+import win32pipe
 
 WriteByte = 1
 WriteWord = 2

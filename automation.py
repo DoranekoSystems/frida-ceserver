@@ -1,7 +1,8 @@
 import os
-import sys
-import paramiko
 import subprocess
+import sys
+
+import paramiko
 
 
 def open_terminal(command):
@@ -26,10 +27,10 @@ def open_terminal(command):
 
 
 class ADBAutomation:
-    def __init__(self, configJson):
-        self.ceserver_path = configJson["ceserver_path"]
-        self.frida_server_path = configJson["frida_server_path"]
-        self.gdbserver_path = configJson["gdbserver_path"]
+    def __init__(self, config_json):
+        self.ceserver_path = config_json["ceserver_path"]
+        self.frida_server_path = config_json["frida_server_path"]
+        self.gdbserver_path = config_json["gdbserver_path"]
 
     def exec_ceserver(self):
         binary_name = self.ceserver_path.split("/")[-1]
@@ -50,13 +51,13 @@ class ADBAutomation:
 
 
 class SSHAutomation:
-    def __init__(self, configJson):
-        self.ip = configJson["ip"]
-        self.username = configJson["username"]
-        self.password = configJson["password"]
+    def __init__(self, config_json):
+        self.ip = config_json["ip"]
+        self.username = config_json["username"]
+        self.password = config_json["password"]
 
-        self.ceserver_path = configJson["ceserver_path"]
-        self.debugserver_path = configJson["debugserver_path"]
+        self.ceserver_path = config_json["ceserver_path"]
+        self.debugserver_path = config_json["debugserver_path"]
 
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.WarningPolicy())

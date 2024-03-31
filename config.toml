@@ -5,7 +5,7 @@ engine = "frida"
 
 [frida.general]
 target =  ""
-targetOS = "ios"
+target_os = "ios"
 mode =  "attach"
 binary_path = ""
 # 0:i386 1:x86_64 2:arm 3:aarch64
@@ -35,8 +35,8 @@ gdbserver_path = ""
 [frida.extended_function]
 custom_read_memory = false
 fix_module_size =  false
-manualParser = false
-javaDissect  = false
+manual_parser = false
+java_dissect  = false
 custom_symbol_loader =  ""
 # mono:il2cpp_data_collector
 data_collector = ""
