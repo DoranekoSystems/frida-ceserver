@@ -1324,12 +1324,13 @@ def ceserver(pid, api, symbol_api, config, session):
     DATA_COLLECTOR = config["extended_function"]["data_collector"]
     if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
         mono_pipeserver.mono_init(session, DATA_COLLECTOR)
+    listen_host = config["general"]["listen_host"]
     listen_port = config["general"]["listen_port"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         thread_count = 0
-        s.bind(("127.0.0.1", listen_port))
+        s.bind((listen_host, listen_port))
         s.listen(32)
         s.settimeout(1)
         while True:
