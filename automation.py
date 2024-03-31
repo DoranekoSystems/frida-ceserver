@@ -1,10 +1,5 @@
-import socket
 import os
 import sys
-import re
-import time
-import threading
-import struct
 import paramiko
 import subprocess
 

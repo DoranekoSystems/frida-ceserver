@@ -1,23 +1,22 @@
 import socket
-import select
-import sys
-from struct import *
+from struct import pack, unpack
 import zlib
 import time
 import json
-from enum import IntEnum, auto
+from enum import IntEnum
 import threading
 import random
 import platform
 import subprocess
 import bisect
-from packaging.version import Version, parse
+from packaging.version import parse
 import importlib.util
 import mono_pipeserver
 from define import OS
-from lldbauto import *
+from lldbauto import LLDBAutomation
 import lz4.block
 import queue
+import os
 
 PID = 0
 API = 0
@@ -125,7 +124,7 @@ def ProtectionStringToProtection(protectionstring):
 
 def virtualqueryex(address):
     global RegionList
-    if RegionList == None:
+    if RegionList is None:
         RegionList = API.VirtualQueryExFull(VQE_NOSHARED)
     lpAddress = address
     sorts = [region[0] + region[1] for region in RegionList]
@@ -152,7 +151,7 @@ def virtualqueryex(address):
 def module32first():
     global ModuleList
     global ModuleListIterator
-    if ModuleList == None:
+    if ModuleList is None:
         ModuleList = API.EnumModules()
     ModuleListIterator = 0
     base = ModuleList[0]["base"]
@@ -282,8 +281,8 @@ class BinaryReader:
         return ret
 
     def ReadString16(self):
-        l = self.ReadUInt16()
-        result = recvall(self.base, l)
+        length = self.ReadUInt16()
+        result = recvall(self.base, length)
         ret = result.decode()
         return ret
 
@@ -350,7 +349,7 @@ def GetSymbolListFromFile(filename, output):
                         _type = 0
                         name = method["Name"]
                         ret.append([baseaddress, size, _type, name])
-    if ret != False and len(ret) > 0:
+    if ret and len(ret) > 0:
         bytecode = b""
         for i in range(len(ret)):
             baseaddress = ret[i][0]
@@ -370,7 +369,7 @@ def GetSymbolListFromFile(filename, output):
                     name,
                 )
                 bytecode = b"".join([bytecode, tmp])
-            except Exception as e:
+            except Exception:
                 pass
         compress_data = zlib.compress(bytecode)
         sendall_data = pack("<iii", 0, len(compress_data) + 12, len(bytecode))
@@ -388,8 +387,8 @@ def interrupt_func():
                 [
                     wp
                     for wp in WP_INFO_LIST
-                    if (wp["switch"] == True and wp["enabled"] == False)
-                    or (wp["switch"] == False and wp["enabled"] == True)
+                    if (wp["switch"] and not wp["enabled"])
+                    or (not wp["switch"] and wp["enabled"])
                 ]
             )
             > 0
@@ -434,7 +433,7 @@ def debugger_thread():
                     for x in info.keys()
                     if (x.find("T") == 0 and x.find("thread") != -1)
                 ][0]
-            except:
+            except Exception:
                 print("Debugger Thread:info is empty.")
                 Lock.release()
                 continue
@@ -456,7 +455,7 @@ def debugger_thread():
             if is_debugserver:
                 medata = int(info["medata"], 16)
                 if medata == 1:  # Breakpoint
-                    address = struct.unpack("<Q", bytes.fromhex(info["20"]))[0]
+                    address = unpack("<Q", bytes.fromhex(info["20"]))[0]
                     medata = address
                 else:  # Watchpoint
                     medata = int(info["medata"], 16)
@@ -469,7 +468,7 @@ def debugger_thread():
                     medata = int(extracted_sequence)
                 # breakpoint
                 else:
-                    address = struct.unpack(
+                    address = unpack(
                         "<Q", bytes.fromhex(LLDB.encode_message(info["20"]))
                     )[0]
                     medata = address
@@ -480,15 +479,15 @@ def debugger_thread():
                     for i in range(34):
                         try:
                             if i == 33:
-                                address = struct.unpack(
-                                    "<I", bytes.fromhex(info[f"{i:02x}"])
-                                )[0]
+                                address = unpack("<I", bytes.fromhex(info[f"{i:02x}"]))[
+                                    0
+                                ]
                             else:
-                                address = struct.unpack(
-                                    "<Q", bytes.fromhex(info[f"{i:02x}"])
-                                )[0]
+                                address = unpack("<Q", bytes.fromhex(info[f"{i:02x}"]))[
+                                    0
+                                ]
 
-                        except Exception as e:
+                        except Exception:
                             address = 0
                         register_list.append(address)
                 else:
@@ -507,7 +506,7 @@ def debugger_thread():
             # set watchpoint
             for i in range(LLDB_REGISTER_COUNT):
                 wp = WP_INFO_LIST[i]
-                if wp["switch"] == True and wp["enabled"] == False:
+                if wp["switch"] and not wp["enabled"]:
                     address = wp["address"]
                     size = wp["bpsize"]
                     _type = wp["type"]
@@ -523,7 +522,7 @@ def debugger_thread():
             # remove watchpoint
             for i in range(LLDB_REGISTER_COUNT):
                 wp = WP_INFO_LIST[i]
-                if wp["switch"] == False and wp["enabled"] == True:
+                if not wp["switch"] and wp["enabled"]:
                     address = wp["address"]
                     size = wp["bpsize"]
                     _type = wp["type"]
@@ -597,7 +596,7 @@ def handler(ns, nc, command, thread_count):
         if dwFlags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
             ret = module32first()
             while True:
-                if ret != False:
+                if ret:
                     modulename = ret[2].encode()
                     modulenamesize = len(modulename)
                     modulebase = int(ret[0], 16)
@@ -672,7 +671,7 @@ def handler(ns, nc, command, thread_count):
             ret = module32first()
         else:
             ret = module32next()
-        if ret != False:
+        if ret:
             modulename = ret[2].encode()
             modulenamesize = len(modulename)
             modulebase = int(ret[0], 16)
@@ -717,7 +716,7 @@ def handler(ns, nc, command, thread_count):
             ns.sendall(bytecode)
 
     elif command == CECMD.CMD_CLOSEHANDLE:
-        h = reader.ReadInt32()
+        reader.ReadInt32()
         # CloseHandle(h)
         writer.WriteInt32(1)
 
@@ -730,7 +729,6 @@ def handler(ns, nc, command, thread_count):
         else:
             processhandle = random.randint(0, 0x10000)
         print("Processhandle:" + str(processhandle))
-        pHandle = processhandle
         writer.WriteInt32(processhandle)
 
     elif command == CECMD.CMD_GETARCHITECTURE:
@@ -778,7 +776,7 @@ def handler(ns, nc, command, thread_count):
         else:
             ret = API.ReadProcessMemory(address, size)
         if compress == 0:
-            if ret != False:
+            if ret:
                 # iOS
                 if CUSTOM_READ_MEMORY and TARGETOS == OS.IOS.value:
                     decompress_bytes = b""
@@ -788,9 +786,7 @@ def handler(ns, nc, command, thread_count):
                     while True:
                         if (tmp[0:4] != b"bv41") or (tmp[0:4] == b"bv4$"):
                             break
-                        uncompressed_size, compressed_size = struct.unpack(
-                            "<II", tmp[4:12]
-                        )
+                        uncompressed_size, compressed_size = unpack("<II", tmp[4:12])
                         last_uncompressed = lz4.block.decompress(
                             tmp[12 : 12 + compressed_size],
                             uncompressed_size,
@@ -801,7 +797,7 @@ def handler(ns, nc, command, thread_count):
                     ret = decompress_bytes
                 # Android
                 elif CUSTOM_READ_MEMORY and TARGETOS == OS.ANDROID.value:
-                    uncompressed_size = struct.unpack("<I", ret[-4:])[0]
+                    uncompressed_size = unpack("<I", ret[-4:])[0]
                     decompress_bytes = lz4.block.decompress(ret[:-4], uncompressed_size)
                     ret = decompress_bytes
                 writer.WriteInt32(len(ret))
@@ -809,7 +805,7 @@ def handler(ns, nc, command, thread_count):
             else:
                 writer.WriteInt32(0)
         else:
-            if ret != False:
+            if ret:
                 if nc != 0:
                     compress_data = ret
                 else:
@@ -880,7 +876,7 @@ def handler(ns, nc, command, thread_count):
                         ret = LLDB.writemem(address, len(_buf), list(_buf))
                     else:
                         ret = API.WriteProcessMemory(address, list(_buf))
-            if ret != False:
+            if ret:
                 writer.WriteInt32(size)
             else:
                 writer.WriteInt32(0)
@@ -912,7 +908,7 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         baseaddress = reader.ReadUInt64()
         ret = virtualqueryex(baseaddress)
-        if ret != False:
+        if ret:
             protection = ret[2]
             baseaddress = ret[0]
             _type = ret[3]
@@ -931,7 +927,7 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         baseaddress = reader.ReadUInt64()
         ret = virtualqueryex(baseaddress)
-        if ret != False:
+        if ret:
             protection = ret[2]
             baseaddress = ret[0]
             _type = ret[3]
@@ -979,7 +975,7 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_GETSYMBOLLISTFROMFILE:
         if parse(CEVERSION) >= parse("7.5.1"):
-            fileoffset = reader.ReadUInt32()
+            reader.ReadUInt32()
             symbolpathsize = reader.ReadUInt32()
             symbolname = ns.recv(symbolpathsize).decode()
             output = [0]
@@ -1106,7 +1102,7 @@ def handler(ns, nc, command, thread_count):
             writer.WriteInt32(1)
         # manual
         else:
-            if wp["switch"] == False and wp["enabled"] == False:
+            if not wp["switch"] and not wp["enabled"]:
                 _type = ""
                 if bptype == 0:
                     _type = "x"
@@ -1139,14 +1135,14 @@ def handler(ns, nc, command, thread_count):
         handle = reader.ReadInt32()
         tid = reader.ReadInt32()
         debugreg = reader.ReadInt32()
-        wasWatchpoint = reader.ReadInt32()
+        reader.ReadInt32()
         wp = WP_INFO_LIST[debugreg]
         if tid != -1:
             if IS_STOPPED:
                 LLDB.remove_watchpoint(wp["address"], wp["bpsize"], wp["type"])
             writer.WriteInt32(1)
         else:
-            if wp["switch"] == True and wp["enabled"] == True:
+            if wp["switch"] and wp["enabled"]:
                 if IS_STOPPED:
                     ret = LLDB.remove_watchpoint(
                         wp["address"], wp["bpsize"], wp["type"]
@@ -1195,13 +1191,13 @@ def handler(ns, nc, command, thread_count):
             context = ns.recv(structsize)
             for i in range(1, 34):
                 try:
-                    value = struct.unpack("<Q", context[i * 8 : i * 8 + 8])[0]
+                    value = unpack("<Q", context[i * 8 : i * 8 + 8])[0]
                     if REGISTER_INFO[i - 1] != value:
                         if LLDB.write_register(
                             i - 1, int.to_bytes(value, 8, "little").hex()
                         ):
                             REGISTER_INFO[i - 1] = value
-                except Exception as e:
+                except Exception:
                     address = 0
             writer.WriteInt32(1)
         else:
@@ -1224,7 +1220,7 @@ def handler(ns, nc, command, thread_count):
         elif windowsprotection == PAGE_READONLY:
             newprotectionstr = "r--"
         result = API.ExtChangeMemoryProtection(address, size, newprotectionstr)
-        if result == True:
+        if result:
             ret = 1
         else:
             ret = 0
@@ -1235,7 +1231,7 @@ def handler(ns, nc, command, thread_count):
         writer.WriteInt16(0)
 
     elif command == CECMD.CMD_OPENNAMEDPIPE:
-        pipename = reader.ReadString16()
+        reader.ReadString16()
         timeout = reader.ReadUInt32()
         pipehandle = random.randint(1, 0x10000)
         writer.WriteInt32(pipehandle)
@@ -1282,7 +1278,7 @@ def main_thread(conn, native_client, thread_count):
                 break
             command = unpack("<b", b)[0]
             ret = handler(conn, native_client, command, thread_count)
-        except:
+        except Exception:
             import traceback
 
             print("EXCEPTION:" + str(CECMD(command)))

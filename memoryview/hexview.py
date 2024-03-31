@@ -26,11 +26,9 @@
 
 import os
 import sys
-import sys
 import curses
 import struct
 import getopt
-import time
 
 import textmode
 
@@ -1765,7 +1763,6 @@ class HexWindow(textmode.Window):
 
         self.gain_focus()
         while True:
-
             self.check_and_getdata()
             self.draw()
             self.draw_cursor()
@@ -1834,14 +1831,10 @@ class HexWindow(textmode.Window):
             elif key == ">" or key == ".":  # pylint: disable=consider-using-in
                 self.roll_right()
 
-            elif (
-                key == KEY_PAGEUP or key == "Ctrl-U"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEUP or key == "Ctrl-U":  # pylint: disable=consider-using-in
                 self.pageup()
 
-            elif (
-                key == KEY_PAGEDOWN or key == "Ctrl-D"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEDOWN or key == "Ctrl-D":  # pylint: disable=consider-using-in
                 self.pagedown()
 
             elif key == KEY_HOME or key == "g":  # pylint: disable=consider-using-in
@@ -1980,24 +1973,16 @@ class ValueSubWindow(textmode.Window):
         float32 = struct.unpack_from(fmt + "f", data)[0]
         float64 = struct.unpack_from(fmt + "d", data)[0]
 
-        line = " int8 : {:<20}  uint8 : {:<20}  0x{:02x}".format(
-            int8, uint8, uint8
-        )  # pylint: disable=(duplicate-string-formatting-argument
+        line = " int8 : {:<20}  uint8 : {:<20}  0x{:02x}".format(int8, uint8, uint8)  # pylint: disable=(duplicate-string-formatting-argument
         self.puts(0, 0, line, self.colors.text)
 
-        line = " int16: {:<20}  uint16: {:<20}  0x{:04x}".format(
-            int16, uint16, uint16
-        )  # pylint: disable=(duplicate-string-formatting-argument
+        line = " int16: {:<20}  uint16: {:<20}  0x{:04x}".format(int16, uint16, uint16)  # pylint: disable=(duplicate-string-formatting-argument
         self.puts(0, 1, line, self.colors.text)
 
-        line = " int32: {:<20}  uint32: {:<20}  0x{:08x}".format(
-            int32, uint32, uint32
-        )  # pylint: disable=(duplicate-string-formatting-argument
+        line = " int32: {:<20}  uint32: {:<20}  0x{:08x}".format(int32, uint32, uint32)  # pylint: disable=(duplicate-string-formatting-argument
         self.puts(0, 2, line, self.colors.text)
 
-        line = " int64: {:<20}  uint64: {:<20}  0x{:016x}".format(
-            int64, uint64, uint64
-        )  # pylint: disable=(duplicate-string-formatting-argument
+        line = " int64: {:<20}  uint64: {:<20}  0x{:016x}".format(int64, uint64, uint64)  # pylint: disable=(duplicate-string-formatting-argument
         self.puts(0, 3, line, self.colors.text)
 
         line = " float: {:<20}  double: {:<20}  0x{:016x}".format(
@@ -2358,9 +2343,7 @@ Commands
         while True:
             key = getch()
 
-            if (
-                key == KEY_ESC or key == " " or key == KEY_RETURN
-            ):  # pylint: disable=consider-using-in
+            if key == KEY_ESC or key == " " or key == KEY_RETURN:  # pylint: disable=consider-using-in
                 self.lose_focus()
                 return textmode.RETURN_TO_PREVIOUS
 
@@ -2370,14 +2353,10 @@ Commands
             elif key == KEY_DOWN or key == "j":  # pylint: disable=consider-using-in
                 self.move_down()
 
-            elif (
-                key == KEY_PAGEUP or key == "Ctrl-U"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEUP or key == "Ctrl-U":  # pylint: disable=consider-using-in
                 self.pageup()
 
-            elif (
-                key == KEY_PAGEDOWN or key == "Ctrl-D"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEDOWN or key == "Ctrl-D":  # pylint: disable=consider-using-in
                 self.pagedown()
 
             elif key == KEY_HOME or key == "g":  # pylint: disable=consider-using-in
@@ -2443,9 +2422,7 @@ Copyright 2016 by
 Walter de Jong <walter@heiho.net>
 
 This is free software, available
-under terms of the MIT license""".format(
-            "-" * len(VERSION), VERSION
-        )
+under terms of the MIT license""".format("-" * len(VERSION), VERSION)
 
         colors = textmode.ColorSet(BLACK, WHITE)
         colors.title = textmode.video_color(RED, WHITE)

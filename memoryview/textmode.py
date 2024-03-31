@@ -533,9 +533,7 @@ class Rect:
         If visible, returns clipped tuple: True, x, y, w
         """
 
-        if (
-            x + w < 0 or x >= self.w or y < 0 or y >= self.h
-        ):  # pylint: disable=chained-comparison
+        if x + w < 0 or x >= self.w or y < 0 or y >= self.h:  # pylint: disable=chained-comparison
             return False, -1, -1, -1
 
         if x < 0:
@@ -552,9 +550,7 @@ class Rect:
         If visible, returns clipped tuple: True, x, y, h
         """
 
-        if (
-            x < 0 or x >= self.w or y + h < 0 or y >= self.h
-        ):  # pylint: disable=chained-comparison
+        if x < 0 or x >= self.w or y + h < 0 or y >= self.h:  # pylint: disable=chained-comparison
             return False, -1, -1, -1
 
         if y < 0:
@@ -571,9 +567,7 @@ class Rect:
         If visible, returns clipped tuple: True, x, y, w, h
         """
 
-        if (
-            x + w < 0 or x >= self.w or y + h < 0 or y >= self.h
-        ):  # pylint: disable=chained-comparison
+        if x + w < 0 or x >= self.w or y + h < 0 or y >= self.h:  # pylint: disable=chained-comparison
             return False, -1, -1, -1, -1
 
         if x < 0:
@@ -1709,14 +1703,10 @@ class TextWindow(Window):
             elif key == KEY_RIGHT:
                 self.move_right()
 
-            elif (
-                key == KEY_PAGEUP or key == "Ctrl-U"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEUP or key == "Ctrl-U":  # pylint: disable=consider-using-in
                 self.pageup()
 
-            elif (
-                key == KEY_PAGEDOWN or key == "Ctrl-D"
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEDOWN or key == "Ctrl-D":  # pylint: disable=consider-using-in
                 self.pagedown()
 
             elif key == KEY_HOME:
@@ -2048,9 +2038,7 @@ class Alert(Window):
             if key == KEY_LEFT or key == KEY_BTAB:  # pylint: disable=consider-using-in
                 self.move_left()
 
-            elif (
-                key == KEY_RIGHT or key == KEY_TAB
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_RIGHT or key == KEY_TAB:  # pylint: disable=consider-using-in
                 self.move_right()
 
             elif key == KEY_RETURN or key == " ":  # pylint: disable=consider-using-in
@@ -2273,14 +2261,10 @@ class Menu(Window):
             elif key == KEY_DOWN:
                 self.move_down()
 
-            elif (
-                key == KEY_PAGEUP or key == KEY_HOME
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEUP or key == KEY_HOME:  # pylint: disable=consider-using-in
                 self.goto_top()
 
-            elif (
-                key == KEY_PAGEDOWN or key == KEY_END
-            ):  # pylint: disable=consider-using-in
+            elif key == KEY_PAGEDOWN or key == KEY_END:  # pylint: disable=consider-using-in
                 self.goto_bottom()
 
             elif key == KEY_RETURN or key == " ":  # pylint: disable=consider-using-in
@@ -3142,7 +3126,6 @@ def getch():
     # __MODIFY__
     STDSCR.timeout(0)
     while True:
-
         key = STDSCR.getch()
 
         ## DEBUG

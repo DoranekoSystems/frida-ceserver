@@ -1,12 +1,5 @@
-import socket
-import select
-import sys
-from struct import *
-import zlib
-import time
-from enum import IntEnum, auto
-import threading
-import random
+from struct import pack, unpack
+from enum import IntEnum
 import win32pipe
 import win32file
 
@@ -176,7 +169,7 @@ def handler(pipe, command):
         name = CLASSES_INFO[handle]
         try:
             methods = API.GetClassMethods(name)[0]["classes"][0]["methods"]
-        except Exception as e:
+        except Exception:
             writer.WriteInt32(0)
             return
         writer.WriteInt32(len(methods))
@@ -221,7 +214,7 @@ def handler(pipe, command):
         writer.WriteInt16(0)
 
     elif command == CEPIPECMD.JAVACMD_DEREFERENCELOCALOBJECT:
-        object = reader.ReadInt64()
+        _ = reader.ReadInt64()
 
     else:
         pass
@@ -233,7 +226,7 @@ def main_thread(pipe):
         try:
             command = READER.ReadUInt8()
             ret = handler(pipe, command)
-        except:
+        except Exception:
             import traceback
 
             print("EXCEPTION:" + str(CEPIPECMD(command)))

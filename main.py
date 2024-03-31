@@ -4,13 +4,14 @@ import time
 import sys
 import ceserver as ce
 import platform
+import toml
+from define import OS, MODE
+from automation import ADBAutomation, SSHAutomation
+import os
 
 hostos = platform.system()
 if hostos == "Windows":
     import ceserver_memprocfs as cememprocfs
-import toml
-from define import OS, MODE
-from automation import *
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/memoryview")
 from hexview import memory_view_mode
@@ -79,7 +80,7 @@ def main(package, pid=None, run_mode=None, memory_address=None):
             device = frida.get_device_manager().add_remote_device(frida_server_ip)
         else:
             device = get_device()
-        if pid == None:
+        if pid is None:
             apps = device.enumerate_applications()
             target = package
             for app in apps:
@@ -101,12 +102,12 @@ def main(package, pid=None, run_mode=None, memory_address=None):
             device = frida.get_device_manager().add_remote_device(frida_server_ip)
         else:
             device = frida.get_remote_device()
-        if pid == None:
+        if pid is None:
             processes = device.enumerate_processes()
             target = package
             for process in processes:
                 if target == str(process.pid) or target == process.name:
-                    process_name = process.name
+                    # process_name = process.name
                     process_id = process.pid
                     break
             if mode == MODE.SPAWN.value:

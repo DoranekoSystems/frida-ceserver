@@ -1,11 +1,5 @@
-import socket
-import select
-import sys
-from struct import *
-import zlib
-import time
-from enum import IntEnum, auto
-import threading
+from struct import pack, unpack
+from enum import IntEnum
 
 WriteByte = 1
 WriteWord = 2
@@ -343,7 +337,7 @@ def mono_process(buf):
                 ret = HANDLER.__next__()
                 if ret == 1:
                     IS_COMMAND = True
-            except:
+            except Exception:
                 import traceback
 
                 print("EXCEPTION:" + str(CEPIPECMD(command)))
@@ -356,7 +350,7 @@ def mono_process(buf):
                 ret = HANDLER.__next__()
                 if ret == 1:
                     IS_COMMAND = True
-            except:
+            except Exception:
                 import traceback
 
                 print("EXCEPTION:" + str(CEPIPECMD(command)))

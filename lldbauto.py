@@ -1,9 +1,4 @@
 import socket
-import os
-import sys
-import re
-import time
-import threading
 import struct
 
 
@@ -52,7 +47,7 @@ class LLDBAutomation:
             return result[1:-3]
 
     def attach(self, pid):
-        result = self.send_message(f"vAttach;{pid:02x}")
+        self.send_message(f"vAttach;{pid:02x}")
         self.attach_pid = pid
 
     def cont(self):
