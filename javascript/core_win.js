@@ -53,6 +53,91 @@ var allocList = {};
 
 const PS = Process.pointerSize;
 
+/*speedhack*/
+var hookFlag = false;
+
+var speedMultiplier = 1;
+var initialOffset = 0;
+var initialTime = 0;
+var initialOffset64 = 0;
+var initialTime64 = 0;
+var initialOffsetTC64 = 0;
+var initialTimeTC64 = 0;
+
+var GetTickCount_isReal = false;
+var GetTickCount64_isReal = false;
+var QueryPerformanceCounter_isReal = false;
+
+var GetTickCountPtr = Module.findExportByName('kernel32.dll', 'GetTickCount');
+var GetTickCount = new NativeFunction(GetTickCountPtr, 'uint', []);
+var GetTickCount64Ptr = Module.findExportByName('kernel32.dll', 'GetTickCount64');
+if (GetTickCount64Ptr != null) {
+  var GetTickCount64 = new NativeFunction(GetTickCount64Ptr, 'uint64', []);
+}
+var QueryPerformanceCounterPtr = Module.findExportByName('kernel32.dll', 'QueryPerformanceCounter');
+var QueryPerformanceCounter = new NativeFunction(QueryPerformanceCounterPtr, 'bool', ['pointer']);
+
+function speedhackVersion_GetTickCount() {
+  var currentTime = GetTickCount();
+  if (GetTickCount_isReal) {
+    return currentTime;
+  }
+  var result = Math.trunc((currentTime - initialTime) * speedMultiplier) + initialOffset;
+  return result;
+}
+
+function speedhackVersion_GetTickCount64() {
+  var currentTime = GetTickCount64();
+  if (GetTickCount64_isReal) {
+    return currentTime;
+  }
+  var result = Math.trunc((currentTime - initialTimeTC64) * speedMultiplier) + initialOffsetTC64;
+  return result;
+}
+
+function speedhackVersion_QueryPerformanceCounter(x) {
+  var currentTime64Ptr = Memory.alloc(8);
+  var result = QueryPerformanceCounter(currentTime64Ptr);
+  var currentTime64 = currentTime64Ptr.readS64();
+  if (QueryPerformanceCounter_isReal) {
+    x.writeS64(currentTime64);
+    return result;
+  }
+  var newX = Math.trunc((currentTime64 - initialTime64) * speedMultiplier) + initialOffset64;
+  x.writeS64(newX);
+
+  return result;
+}
+
+function speedhack_initializeSpeed(speed) {
+  initialOffset = speedhackVersion_GetTickCount();
+
+  GetTickCount_isReal = true;
+  initialTime = GetTickCount();
+  GetTickCount_isReal = false;
+
+  var initialOffset64Ptr = Memory.alloc(8);
+  var initialTime64Ptr = Memory.alloc(8);
+  speedhackVersion_QueryPerformanceCounter(initialOffset64Ptr);
+
+  QueryPerformanceCounter_isReal = true;
+  QueryPerformanceCounter(initialTime64Ptr);
+  QueryPerformanceCounter_isReal = false;
+
+  initialOffset64 = initialOffset64Ptr.readS64();
+  initialTime64 = initialTime64Ptr.readS64();
+
+  if (GetTickCount64Ptr != null) {
+    initialOffsetTC64 = speedhackVersion_GetTickCount64();
+
+    GetTickCount64_isReal = true;
+    initialTimeTC64 = GetTickCount64();
+    GetTickCount64_isReal = false;
+  }
+
+  speedMultiplier = speed;
+}
+
 Module.load('Dbghelp.dll');
 
 var GetCurrentProcessPtr = Module.findExportByName(null, 'GetCurrentProcess');
@@ -247,6 +332,26 @@ rpc.exports = {
     return result;
   },
   extsetspeed: function (speed) {
+    speedhack_initializeSpeed(speed);
+
+    if (hookFlag == false) {
+      Interceptor.replace(
+        GetTickCountPtr,
+        new NativeCallback(speedhackVersion_GetTickCount, 'uint', [])
+      );
+      if (GetTickCount64Ptr != null) {
+        Interceptor.replace(
+          GetTickCount64Ptr,
+          new NativeCallback(speedhackVersion_GetTickCount64, 'uint64', [])
+        );
+      }
+      Interceptor.replace(
+        QueryPerformanceCounterPtr,
+        new NativeCallback(speedhackVersion_QueryPerformanceCounter, 'int', ['pointer'])
+      );
+      hookFlag = true;
+    }
+
     return 1;
   },
   extloadmodule: function (modulepath) {
