@@ -1,5 +1,6 @@
 import os
 import platform
+import re
 import sys
 import threading
 import time
@@ -20,6 +21,13 @@ from hexview import memory_view_mode
 
 with open("config.toml") as f:
     config = toml.loads(f.read())
+
+
+def parse_int(s):
+    if re.match(r"^0x[0-9a-fA-F]+$", s):
+        return int(s, 16)
+    else:
+        return int(s)
 
 
 def get_device():
@@ -203,7 +211,7 @@ if __name__ == "__main__":
                 if target == "":
                     if mode != MODE.ENUM.value:
                         if args[1] == "-p" or args[1] == "--pid":
-                            pid = int(args[2])
+                            pid = parse_int(args[2])
                             main(None, pid)
                         else:
                             main(args[1])
@@ -216,7 +224,7 @@ if __name__ == "__main__":
                     if binary_path == "":
                         if mode != MODE.ENUM.value:
                             if args[1] == "-p" or args[1] == "--pid":
-                                pid = int(args[2])
+                                pid = parse_int(args[2])
                                 main(None, pid)
                             else:
                                 main(args[1])
