@@ -12,3 +12,4 @@ class OS(Enum):
 class MODE(Enum):
     SPAWN = "spawn"
     ATTACH = "attach"
+    ENUM = "enum"

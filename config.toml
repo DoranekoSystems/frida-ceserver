@@ -6,7 +6,8 @@ engine = "frida"
 [frida.general]
 target =  ""
 target_os = "ios"
-mode =  "attach"
+# attach spawn enum
+mode =  "enum"
 binary_path = ""
 # 0:i386 1:x86_64 2:arm 3:aarch64
 arch = 3

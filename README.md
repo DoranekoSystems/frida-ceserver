@@ -54,6 +54,11 @@ python main.py com.saurik.Cydia
 # or
 
 python main.py -p ProcessId
+
+# or
+:config.toml mode = "enum"
+python main.py
+
 ```
 
 Then, connect to the Cheat Engine in network mode.

@@ -17,13 +17,16 @@ import lz4.block
 from packaging.version import parse
 
 import mono_pipeserver
-from define import OS
+from define import MODE, OS
 from lldbauto import LLDBAutomation
 
 PID = 0
 API = 0
 EXTEND_API = 0
 SYMBOL_API = 0
+DEVICE = 0
+_MODE = 0
+CONFIG = 0
 ARCH = 0
 SESSION = 0
 CEVERSION = ""
@@ -36,6 +39,7 @@ DEBUGSERVER_IP = 0
 CUSTOM_READ_MEMORY = 0
 DATA_COLLECTOR = 0
 
+PROCESSES = []
 LLDB = 0
 LLDB_REGISTER_COUNT = 255
 DEBUG_EVENT = []
@@ -578,6 +582,11 @@ def handler(ns, nc, command, thread_count):
     global REGISTER_INFO
     global WP_INFO_LIST
     global CONTINUE_QUEUE
+    global PROCESSES
+    global SESSION
+    global PID
+    global API
+    global SYMBOL_API
 
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
@@ -648,13 +657,33 @@ def handler(ns, nc, command, thread_count):
         h_snapshot = reader.read_int32()
         print("hSnapshot:" + str(h_snapshot))
         if command == CECMD.CMD_PROCESS32FIRST:
-            ret = 1
+            if _MODE == MODE.ENUM.value:
+                PROCESSES = DEVICE.enumerate_processes()
+                process = PROCESSES.pop(0)
+                if len(PROCESSES) == 0:
+                    ret = 0
+                else:
+                    ret = 1
+            else:
+                ret = 1
         else:
-            ret = 0
+            if _MODE == MODE.ENUM.value:
+                process = PROCESSES.pop(0)
+                if len(PROCESSES) == 0:
+                    ret = 0
+                else:
+                    ret = 1
+            else:
+                ret = 0
         if ret != 0:
-            processname = "self".encode()
-            processnamesize = len(processname)
-            _pid = PID
+            if _MODE == MODE.ENUM.value:
+                processname = process.name.encode()
+                processnamesize = len(processname)
+                _pid = process.pid
+            else:
+                processname = "self".encode()
+                processnamesize = len(processname)
+                _pid = PID
             bytecode = pack(
                 "<iii" + str(processnamesize) + "s",
                 ret,
@@ -730,6 +759,52 @@ def handler(ns, nc, command, thread_count):
             processhandle = reader2.read_int32()
         else:
             processhandle = random.randint(0, 0x10000)
+
+            if _MODE == MODE.ENUM.value:
+
+                def on_message(message, data):
+                    print(message)
+
+                SESSION = DEVICE.attach(pid)
+                if TARGETOS == OS.WINDOWS.value:
+                    with open("javascript/core_win.js", "r") as f:
+                        jscode = f.read()
+                else:
+                    with open("javascript/core.js", "r") as f:
+                        jscode = f.read()
+                    with open("javascript/symbol.js", "r") as f:
+                        jscode2 = f.read()
+                script = SESSION.create_script(jscode)
+                script.on("message", on_message)
+                script.load()
+                api = script.exports_sync
+                api.SetConfig(CONFIG)
+                symbol_api = 0
+                if TARGETOS != OS.WINDOWS.value:
+                    script2 = SESSION.create_script(jscode2)
+                    script2.on("message", on_message)
+                    script2.load()
+                    symbol_api = script2.exports_sync
+                if _MODE == MODE.ATTACH.value:
+                    info = api.GetInfo()
+                    process_id = info["pid"]
+                if JAVA_DISSECT:
+                    if TARGETOS in [OS.ANDROID.value, OS.IOS.value]:
+                        print("javaDissect Enabled")
+                        import java_pipeserver as javapipe
+
+                        jthread = threading.Thread(
+                            target=javapipe.pipeserver,
+                            args=(
+                                process_id,
+                                SESSION,
+                            ),
+                            daemon=True,
+                        )
+                        jthread.start()
+                PID = pid
+                API = api
+                SYMBOL_API = symbol_api
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
@@ -1291,11 +1366,14 @@ def main_thread(conn, native_client, thread_count):
             break
 
 
-def ceserver(pid, api, symbol_api, config, session):
+def ceserver(pid, api, symbol_api, config, session, device):
     global PID
     global API
     global EXTEND_API
     global SYMBOL_API
+    global DEVICE
+    global _MODE
+    global CONFIG
     global ARCH
     global SESSION
     global CEVERSION
@@ -1311,6 +1389,9 @@ def ceserver(pid, api, symbol_api, config, session):
     PID = pid
     API = api
     SYMBOL_API = symbol_api
+    DEVICE = device
+    _MODE = config["general"]["mode"]
+    CONFIG = config
     ARCH = config["general"]["arch"]
     SESSION = session
     CEVERSION = config["general"]["ceversion"]

@@ -95,8 +95,10 @@ def main(package, pid=None, run_mode=None, memory_address=None):
                 session = device.attach(process_id)
                 device.resume(process_id)
                 time.sleep(1)
-            else:
+            elif mode == MODE.ATTACH.value:
                 session = device.attach(app_name)
+            else:
+                pass
         else:
             session = device.attach(pid)
     else:
@@ -117,54 +119,64 @@ def main(package, pid=None, run_mode=None, memory_address=None):
                 session = device.attach(process_id)
                 device.resume(process_id)
                 time.sleep(1)
-            else:
+            elif mode == MODE.ATTACH.value:
                 session = device.attach(process_id)
+            else:
+                pass
         else:
             session = device.attach(pid)
 
     def on_message(message, data):
         print(message)
 
-    if target_os == OS.WINDOWS.value:
-        with open("javascript/core_win.js", "r") as f:
-            jscode = f.read()
-    else:
-        with open("javascript/core.js", "r") as f:
-            jscode = f.read()
-        with open("javascript/symbol.js", "r") as f:
-            jscode2 = f.read()
-    script = session.create_script(jscode)
-    script.on("message", on_message)
-    script.load()
-    api = script.exports_sync
-    api.SetConfig(config)
-    if run_mode == "memoryview":
-        memory_view_mode(api, memory_address)
-        return
-    symbol_api = 0
-    if target_os != OS.WINDOWS.value:
-        script2 = session.create_script(jscode2)
-        script2.on("message", on_message)
-        script2.load()
-        symbol_api = script2.exports_sync
-    if mode == MODE.ATTACH.value:
-        info = api.GetInfo()
-        process_id = info["pid"]
-    if java_dissect:
-        if target_os in [OS.ANDROID.value, OS.IOS.value]:
-            print("javaDissect Enabled")
-            import java_pipeserver as javapipe
+    if mode != MODE.ENUM.value or run_mode == "memoryview":
+        if target_os == OS.WINDOWS.value:
+            with open("javascript/core_win.js", "r") as f:
+                jscode = f.read()
+        else:
+            with open("javascript/core.js", "r") as f:
+                jscode = f.read()
+            with open("javascript/symbol.js", "r") as f:
+                jscode2 = f.read()
+        script = session.create_script(jscode)
+        script.on("message", on_message)
+        script.load()
+        api = script.exports_sync
+        api.SetConfig(config)
+        symbol_api = 0
 
-            jthread = threading.Thread(
-                target=javapipe.pipeserver,
-                args=(
-                    process_id,
-                    session,
-                ),
-                daemon=True,
-            )
-            jthread.start()
-    ce.ceserver(process_id, api, symbol_api, config, session)
+        if run_mode == "memoryview":
+            memory_view_mode(api, memory_address)
+            return
+
+        if target_os != OS.WINDOWS.value:
+            script2 = session.create_script(jscode2)
+            script2.on("message", on_message)
+            script2.load()
+            symbol_api = script2.exports_sync
+        if mode == MODE.ATTACH.value:
+            info = api.GetInfo()
+            process_id = info["pid"]
+        if java_dissect:
+            if target_os in [OS.ANDROID.value, OS.IOS.value]:
+                print("javaDissect Enabled")
+                import java_pipeserver as javapipe
+
+                jthread = threading.Thread(
+                    target=javapipe.pipeserver,
+                    args=(
+                        process_id,
+                        session,
+                    ),
+                    daemon=True,
+                )
+                jthread.start()
+    else:
+        process_id = None
+        api = None
+        symbol_api = None
+        session = None
+    ce.ceserver(process_id, api, symbol_api, config, session, device)
 
 
 def memprocfs_main(config):
@@ -180,6 +192,7 @@ if __name__ == "__main__":
         target = config["general"]["target"]
         target_os = config["general"]["target_os"]
         binary_path = config["general"]["binary_path"]
+        mode = config["general"]["mode"]
         if "--memoryview" in args:
             memory_address = int(args[args.index("--memoryview") + 1], 16)
             run_mode = "memoryview"
@@ -188,21 +201,27 @@ if __name__ == "__main__":
         else:
             if target_os in [OS.ANDROID.value, OS.IOS.value]:
                 if target == "":
-                    if args[1] == "-p" or args[1] == "--pid":
-                        pid = int(args[2])
-                        main(None, pid)
-                    else:
-                        main(args[1])
-                else:
-                    main(target)
-            else:
-                if target == "":
-                    if binary_path == "":
+                    if mode != MODE.ENUM.value:
                         if args[1] == "-p" or args[1] == "--pid":
                             pid = int(args[2])
                             main(None, pid)
                         else:
                             main(args[1])
+                    else:
+                        main("")
+                else:
+                    main(target)
+            else:
+                if target == "":
+                    if binary_path == "":
+                        if mode != MODE.ENUM.value:
+                            if args[1] == "-p" or args[1] == "--pid":
+                                pid = int(args[2])
+                                main(None, pid)
+                            else:
+                                main(args[1])
+                        else:
+                            main("")
                     else:
                         main("")
                 else:
