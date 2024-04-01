@@ -487,12 +487,13 @@ def handler(ns, command, thread_count):
                 writer.write_int32(0)
 
     elif command == CECMD.CMD_WRITEPROCESSMEMORY:
-        # not implement
+        # wip
         _handle = reader.read_uint32()
         address = reader.read_uint64()
         size = reader.read_uint32()
         if size > 0:
             _buf = ns.recv(size)
+            Process.memory.write(address, _buf)
             ret = True
             if ret:
                 writer.write_int32(size)
