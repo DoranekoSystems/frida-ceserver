@@ -52,6 +52,7 @@ var regionList = Process.enumerateRanges('r--');
 var allocList = {};
 
 const PS = Process.pointerSize;
+const is64Bit = PS == 8 ? true : false;
 
 /*speedhack*/
 var hookFlag = false;
@@ -272,6 +273,27 @@ rpc.exports = {
     return regionInfos;
   },
   getsymbollistfromfile: function (name) {
+    if (!is64Bit) {
+      var module = Process.getModuleByName(name);
+      var symbols = module.enumerateSymbols();
+      var symbollist = [];
+      for (var i = 0; i < symbols.length; i++) {
+        var baseaddress = symbols[i].address;
+        if (baseaddress <= 0) continue;
+        baseaddress = baseaddress - module.base;
+        var size = symbols[i].size;
+        if (size == null) {
+          size = 1;
+        }
+        var type = symbols[i].type;
+        var name = symbols[i].name;
+        if (type == 'function') {
+          type = 0;
+          symbollist.push([baseaddress, size, type, name]);
+        }
+      }
+      return symbollist;
+    }
     var symbollist = [];
     var callbackFunction = new NativeCallback(
       (p, size, p2) => {
