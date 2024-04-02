@@ -9,8 +9,8 @@ target_os = "ios"
 # attach spawn enum
 mode =  "attach"
 binary_path = ""
-# 0:i386 1:x86_64 2:arm 3:aarch64
-arch = 3
+# ia32 x64 arm arm64
+arch = "arm64"
 ceversion =  "7.5.2"
 # Setting it to '0.0.0.0' allows connections from other PC
 listen_host = "127.0.0.1"
@@ -47,8 +47,8 @@ data_collector = ""
 [memprocfs.general]
 # example:"pmem://C:\\pmem\\winpmem_x64.sys"
 device = ""
-# 0:i386 1:x86_64 2:arm 3:aarch64
-arch = 1
+# ia32 x64 arm arm64
+arch = "x64"
 ceversion =  "7.5.2"
 # Setting it to '0.0.0.0' allows connections from other PC
 listen_host = "127.0.0.1"

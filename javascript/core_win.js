@@ -171,7 +171,8 @@ rpc.exports = {
     var GetCurrentProcessIdPtr = Module.findExportByName(null, 'GetCurrentProcessId');
     var GetCurrentProcessId = new NativeFunction(GetCurrentProcessIdPtr, 'int', []);
     var pid = GetCurrentProcessId();
-    var info = { pid: pid };
+    var arch = Process.arch;
+    var info = { pid: pid, arch: arch };
     return info;
   },
   readprocessmemory: function (address, size) {

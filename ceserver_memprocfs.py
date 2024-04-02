@@ -10,6 +10,7 @@ import memprocfs
 from packaging.version import parse
 
 import mono_pipeserver
+from define import ARCHITECTURE
 
 PID = 0
 CEVERSION = 0
@@ -54,6 +55,17 @@ ModuleListIterator = 0
 Process = 0
 ProcessList = None
 ProcessListIterator = 0
+
+
+def arch_to_number(arch):
+    if arch == ARCHITECTURE.IA32.value:
+        return 0
+    elif arch == ARCHITECTURE.X64.value:
+        return 1
+    elif arch == ARCHITECTURE.ARM.value:
+        return 2
+    elif arch == ARCHITECTURE.ARM64.value:
+        return 3
 
 
 def protection_string_to_type(protectionstring):
@@ -455,8 +467,8 @@ def handler(ns, command, thread_count):
     elif command == CECMD.CMD_GETARCHITECTURE:
         if parse(CEVERSION) >= parse("7.4.1"):
             _handle = reader.read_int32()
-        arch = ARCH
-        writer.write_int8(arch)
+        arch_number = arch_to_number(ARCH)
+        writer.write_int8(arch_number)
 
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
         size = reader.read_int32()
@@ -678,7 +690,7 @@ def handler(ns, command, thread_count):
         if parse(CEVERSION) < parse("7.4.2"):
             _type = reader.read_int32()
         writer.write_int32(1)
-        if ARCH == 3:
+        if ARCH == ARCHITECTURE.ARM64.value:
             ns.sendall(b"\x00" * 8 * 34)
         else:
             pass

@@ -13,3 +13,10 @@ class MODE(Enum):
     SPAWN = "spawn"
     ATTACH = "attach"
     ENUM = "enum"
+
+
+class ARCHITECTURE(Enum):
+    IA32 = "ia32"
+    X64 = "x64"
+    ARM = "arm"
+    ARM64 = "arm64"

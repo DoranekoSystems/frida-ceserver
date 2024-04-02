@@ -384,7 +384,8 @@ rpc.exports = {
   },
   getinfo: function () {
     var pid = Process.id;
-    var info = { pid: pid };
+    var arch = Process.arch;
+    var info = { pid: pid, arch: arch };
     return info;
   },
   readprocessmemory: function (address, size) {

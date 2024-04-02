@@ -17,7 +17,7 @@ import lz4.block
 from packaging.version import parse
 
 import mono_pipeserver
-from define import MODE, OS
+from define import ARCHITECTURE, MODE, OS
 from lldbauto import LLDBAutomation
 
 PID = 0
@@ -91,6 +91,17 @@ VQE_NOSHARED = 4
 RegionList = None
 ModuleList = None
 ModuleListIterator = 0
+
+
+def arch_to_number(arch):
+    if arch == ARCHITECTURE.IA32.value:
+        return 0
+    elif arch == ARCHITECTURE.X64.value:
+        return 1
+    elif arch == ARCHITECTURE.ARM.value:
+        return 2
+    elif arch == ARCHITECTURE.ARM64.value:
+        return 3
 
 
 def protection_string_to_type(protectionstring):
@@ -481,7 +492,7 @@ def debugger_thread():
 
             if medata > 0x100000:
                 register_list = []
-                if ARCH == 3:
+                if ARCH == ARCHITECTURE.ARM64.value:
                     for i in range(34):
                         try:
                             if i == 33:
@@ -785,9 +796,6 @@ def handler(ns, nc, command, thread_count):
                     script2.on("message", on_message)
                     script2.load()
                     symbol_api = script2.exports_sync
-                if _MODE == MODE.ATTACH.value:
-                    info = api.GetInfo()
-                    process_id = info["pid"]
                 if JAVA_DISSECT:
                     if TARGETOS in [OS.ANDROID.value, OS.IOS.value]:
                         print("javaDissect Enabled")
@@ -811,8 +819,8 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_GETARCHITECTURE:
         if parse(CEVERSION) >= parse("7.4.1"):
             handle = reader.read_int32()
-        arch = ARCH
-        writer.write_int8(arch)
+        arch_number = arch_to_number(ARCH)
+        writer.write_int8(arch_number)
 
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
         size = reader.read_int32()
@@ -1239,7 +1247,7 @@ def handler(ns, nc, command, thread_count):
         if parse(CEVERSION) < parse("7.4.2"):
             _type = reader.read_int32()
         writer.write_int32(1)
-        if ARCH == 3:
+        if ARCH == ARCHITECTURE.ARM64.value:
             if parse(CEVERSION) >= parse("7.4.2"):
                 writer.write_int32(808)  # structsize
                 ### Context ###
