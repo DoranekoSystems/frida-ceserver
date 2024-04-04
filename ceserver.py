@@ -15,6 +15,7 @@ from struct import pack, unpack
 import lz4.block
 from packaging.version import parse
 
+import java_pipeserver
 import mono_pipeserver
 from define import ARCHITECTURE, MODE, OS
 from lldbauto import LLDBAutomation
@@ -32,7 +33,7 @@ SESSION = 0
 CEVERSION = ""
 TARGETOS = 0
 MANUAL_PARSER = 0
-JAVA_DISSECT = 0
+JAVA_INFO = 0
 NATIVE_CESERVER_IP = 0
 CUSTOM_SYMBOL_LOADER = []
 DEBUGSERVER_IP = 0
@@ -796,25 +797,13 @@ def handler(ns, nc, command, thread_count):
                     script2.on("message", on_message)
                     script2.load()
                     symbol_api = script2.exports_sync
-                if JAVA_DISSECT:
-                    if TARGETOS in [OS.ANDROID.value, OS.IOS.value]:
-                        print("javaDissect Enabled")
-                        import java_pipeserver as javapipe
-
-                        jthread = threading.Thread(
-                            target=javapipe.pipeserver,
-                            args=(
-                                process_id,
-                                SESSION,
-                            ),
-                            daemon=True,
-                        )
-                        jthread.start()
                 PID = pid
                 API = api
                 SYMBOL_API = symbol_api
                 if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
                     mono_pipeserver.mono_init(SESSION, DATA_COLLECTOR)
+                if JAVA_INFO:
+                    java_pipeserver.java_init(SESSION)
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
@@ -1393,7 +1382,7 @@ def ceserver(pid, api, symbol_api, config, session, device):
     global CEVERSION
     global TARGETOS
     global MANUAL_PARSER
-    global JAVA_DISSECT
+    global JAVA_INFO
     global NATIVE_CESERVER_IP
     global CUSTOM_SYMBOL_LOADER
     global DEBUGSERVER_IP
@@ -1411,7 +1400,7 @@ def ceserver(pid, api, symbol_api, config, session, device):
     CEVERSION = config["general"]["ceversion"]
     TARGETOS = config["general"]["target_os"]
     MANUAL_PARSER = config["extended_function"]["manual_parser"]
-    JAVA_DISSECT = config["extended_function"]["java_dissect"]
+    JAVA_INFO = config["extended_function"]["java_info"]
     NATIVE_CESERVER_IP = config["ipconfig"]["native_ceserver_ip"]
     CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
     DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
@@ -1421,6 +1410,8 @@ def ceserver(pid, api, symbol_api, config, session, device):
         DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc"
     ) and _MODE != MODE.ENUM.value:
         mono_pipeserver.mono_init(session, DATA_COLLECTOR)
+    if JAVA_INFO and _MODE != MODE.ENUM.value:
+        java_pipeserver.java_init(SESSION)
     listen_host = config["general"]["listen_host"]
     listen_port = config["general"]["listen_port"]
 

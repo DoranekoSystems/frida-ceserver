@@ -39,7 +39,7 @@ gdbserver_path = ""
 custom_read_memory = false
 fix_module_size =  false
 manual_parser = false
-java_dissect  = false
+java_info  = false
 custom_symbol_loader =  ""
 # mono:il2cpp_data_collector
 data_collector = ""

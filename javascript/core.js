@@ -367,14 +367,14 @@ function ReadProcessMemory_Custom(address, size) {
 
 var custom_read_memory = false;
 var fix_module_size = false;
-var java_dissect = false;
+var java_info = false;
 var data_collector = '';
 var target_os = '';
 rpc.exports = {
   setconfig: function (config) {
     custom_read_memory = config['extended_function']['custom_read_memory'];
     fix_module_size = config['extended_function']['fix_module_size'];
-    java_dissect = config['extended_function']['java_dissect'];
+    java_info = config['extended_function']['java_info'];
     data_collector = config['extended_function']['data_collector'];
     target_os = config['general']['target_os'];
     console.log(target_os);
@@ -420,7 +420,7 @@ rpc.exports = {
   },
   enummodules: function () {
     var moduleList = Process.enumerateModules();
-    if (java_dissect) {
+    if (java_info) {
       moduleList.push({ base: '0xcececece', size: 0, name: 'jvm.dll' });
       moduleList.push({ base: '0xecececec', size: 0, name: 'CEJVMTI.dll' });
     }
@@ -435,7 +435,7 @@ rpc.exports = {
   },
   module32first: function () {
     moduleList = Process.enumerateModules();
-    if (java_dissect) {
+    if (java_info) {
       moduleList.push({ base: '0xcececece', size: 0, name: 'jvm.dll' });
       moduleList.push({ base: '0xecececec', size: 0, name: 'CEJVMTI.dll' });
     }

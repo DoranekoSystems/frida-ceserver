@@ -55,7 +55,6 @@ def get_device():
 def main(package, pid=None, run_mode=None, memory_address=None):
     target_os = config["general"]["target_os"]
     mode = config["general"]["mode"]
-    java_dissect = config["extended_function"]["java_dissect"]
     frida_server_ip = config["ipconfig"]["frida_server_ip"]
     binary_path = config["general"]["binary_path"]
 
@@ -165,20 +164,6 @@ def main(package, pid=None, run_mode=None, memory_address=None):
         if mode == MODE.ATTACH.value:
             info = api.GetInfo()
             process_id = info["pid"]
-        if java_dissect:
-            if target_os in [OS.ANDROID.value, OS.IOS.value]:
-                print("javaDissect Enabled")
-                import java_pipeserver as javapipe
-
-                jthread = threading.Thread(
-                    target=javapipe.pipeserver,
-                    args=(
-                        process_id,
-                        session,
-                    ),
-                    daemon=True,
-                )
-                jthread.start()
     else:
         process_id = None
         api = None
