@@ -39,6 +39,7 @@ DEBUGSERVER_IP = 0
 CUSTOM_READ_MEMORY = 0
 DATA_COLLECTOR = 0
 
+PIPE_INFO = {}
 PROCESSES = []
 LLDB = 0
 LLDB_REGISTER_COUNT = 255
@@ -666,7 +667,7 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_PROCESS32FIRST or command == CECMD.CMD_PROCESS32NEXT:
         h_snapshot = reader.read_int32()
-        print("hSnapshot:" + str(h_snapshot))
+        # print("hSnapshot:" + str(h_snapshot))
         if command == CECMD.CMD_PROCESS32FIRST:
             if _MODE == MODE.ENUM.value:
                 PROCESSES = DEVICE.enumerate_processes()
@@ -813,6 +814,8 @@ def handler(ns, nc, command, thread_count):
                 PID = pid
                 API = api
                 SYMBOL_API = symbol_api
+                if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
+                    mono_pipeserver.mono_init(SESSION, DATA_COLLECTOR)
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
@@ -824,7 +827,8 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
         size = reader.read_int32()
-        ns.recv(size)
+        name = ns.recv(size).decode()
+        print(f"This thread is called {name}")
 
     elif command == CECMD.CMD_READPROCESSMEMORY:
         handle = reader.read_uint32()
@@ -1316,18 +1320,19 @@ def handler(ns, nc, command, thread_count):
         writer.write_int16(0)
 
     elif command == CECMD.CMD_OPENNAMEDPIPE:
-        reader.read_string16()
+        name = reader.read_string16()
         timeout = reader.read_uint32()
         pipehandle = random.randint(1, 0x10000)
+        PIPE_INFO[pipehandle] = name
         writer.write_int32(pipehandle)
 
     elif command == CECMD.CMD_PIPEREAD:
         pipehandle = reader.read_uint32()
         size = reader.read_uint32()
         timeout = reader.read_uint32()
-
-        mono_writer = mono_pipeserver.WRITER
-        ret = mono_writer.read_message(size)
+        if PIPE_INFO[pipehandle].find("cemonodc_pid") == 0:
+            mono_writer = mono_pipeserver.WRITER
+            ret = mono_writer.read_message(size)
         writer.write_uint32(len(ret))
         ns.sendall(ret)
 
@@ -1336,8 +1341,8 @@ def handler(ns, nc, command, thread_count):
         size = reader.read_uint32()
         timeout = reader.read_uint32()
         buf = ns.recv(size)
-
-        mono_pipeserver.mono_process(buf)
+        if PIPE_INFO[pipehandle].find("cemonodc_pid") == 0:
+            mono_pipeserver.mono_process(buf)
         writer.write_uint32(size)
 
     elif command == CECMD.CMD_ISANDROID:
@@ -1411,7 +1416,9 @@ def ceserver(pid, api, symbol_api, config, session, device):
     DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
     CUSTOM_READ_MEMORY = config["extended_function"]["custom_read_memory"]
     DATA_COLLECTOR = config["extended_function"]["data_collector"]
-    if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
+    if (
+        DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc"
+    ) and _MODE != MODE.ENUM.value:
         mono_pipeserver.mono_init(session, DATA_COLLECTOR)
     listen_host = config["general"]["listen_host"]
     listen_port = config["general"]["listen_port"]

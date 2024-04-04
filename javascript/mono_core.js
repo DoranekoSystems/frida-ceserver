@@ -41,8 +41,11 @@ function WriteUtf8String(message) {
 
 var coreLibraryName = '';
 var hMono = 0;
-if (Process.platform != 'darwin') {
+if (Process.platform == 'linux') {
   coreLibraryName = 'libil2cpp.so';
+  hMono = Process.getModuleByName(coreLibraryName).base;
+} else if (Process.platform == 'windows') {
+  coreLibraryName = 'GameAssembly.dll';
   hMono = Process.getModuleByName(coreLibraryName).base;
 } else {
   coreLibraryName = null;
