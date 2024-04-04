@@ -4,7 +4,6 @@ import json
 import os
 import platform
 import queue
-import random
 import socket
 import subprocess
 import threading
@@ -19,6 +18,7 @@ from packaging.version import parse
 import mono_pipeserver
 from define import ARCHITECTURE, MODE, OS
 from lldbauto import LLDBAutomation
+from util import HandleManager
 
 PID = 0
 API = 0
@@ -39,7 +39,6 @@ DEBUGSERVER_IP = 0
 CUSTOM_READ_MEMORY = 0
 DATA_COLLECTOR = 0
 
-PIPE_INFO = {}
 PROCESSES = []
 LLDB = 0
 LLDB_REGISTER_COUNT = 255
@@ -609,7 +608,7 @@ def handler(ns, nc, command, thread_count):
     if command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT:
         dw_flags = reader.read_int32()
         pid = reader.read_int32()
-        h_snapshot = random.randint(1, 0x10000)
+        h_snapshot = HandleManager.create_handle()
         writer.write_int32(h_snapshot)
 
     elif command == CECMD.CMD_CREATETOOLHELP32SNAPSHOTEX:
@@ -662,7 +661,7 @@ def handler(ns, nc, command, thread_count):
             for id in idlist:
                 writer.write_int32(id)
         else:
-            h_snapshot = random.randint(1, 0x10000)
+            h_snapshot = HandleManager.create_handle()
             writer.write_int32(h_snapshot)
 
     elif command == CECMD.CMD_PROCESS32FIRST or command == CECMD.CMD_PROCESS32NEXT:
@@ -770,7 +769,7 @@ def handler(ns, nc, command, thread_count):
             writer2.write_int32(pid)
             processhandle = reader2.read_int32()
         else:
-            processhandle = random.randint(0, 0x10000)
+            processhandle = HandleManager.create_handle()
 
             if _MODE == MODE.ENUM.value:
 
@@ -1116,7 +1115,7 @@ def handler(ns, nc, command, thread_count):
         startaddress = reader.read_uint64()
         parameter = reader.read_uint64()
         r = API.ExtCreateThread(startaddress, parameter)
-        threadhandle = random.randint(0, 0x10000)
+        threadhandle = HandleManager.create_handle()
         writer.write_int32(threadhandle)
 
     elif command == CECMD.CMD_GETABI:
@@ -1322,15 +1321,16 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_OPENNAMEDPIPE:
         name = reader.read_string16()
         timeout = reader.read_uint32()
-        pipehandle = random.randint(1, 0x10000)
-        PIPE_INFO[pipehandle] = name
+        pipehandle = HandleManager.create_handle()
+        HandleManager.set_info(pipehandle, {"name": name})
         writer.write_int32(pipehandle)
 
     elif command == CECMD.CMD_PIPEREAD:
         pipehandle = reader.read_uint32()
         size = reader.read_uint32()
         timeout = reader.read_uint32()
-        if PIPE_INFO[pipehandle].find("cemonodc_pid") == 0:
+        info = HandleManager.get_info(pipehandle)
+        if info["name"].find("cemonodc_pid") == 0:
             mono_writer = mono_pipeserver.WRITER
             ret = mono_writer.read_message(size)
         writer.write_uint32(len(ret))
@@ -1341,7 +1341,8 @@ def handler(ns, nc, command, thread_count):
         size = reader.read_uint32()
         timeout = reader.read_uint32()
         buf = ns.recv(size)
-        if PIPE_INFO[pipehandle].find("cemonodc_pid") == 0:
+        info = HandleManager.get_info(pipehandle)
+        if info["name"].find("cemonodc_pid") == 0:
             mono_pipeserver.mono_process(buf)
         writer.write_uint32(size)
 

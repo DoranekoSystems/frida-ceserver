@@ -1,5 +1,4 @@
 import bisect
-import random
 import socket
 import threading
 import zlib
@@ -11,6 +10,7 @@ from packaging.version import parse
 
 import mono_pipeserver
 from define import ARCHITECTURE
+from util import HandleManager
 
 PID = 0
 CEVERSION = 0
@@ -322,7 +322,7 @@ def handler(ns, command, thread_count):
     if command == CECMD.CMD_CREATETOOLHELP32SNAPSHOT:
         dw_flags = reader.read_int32()
         pid = reader.read_int32()
-        h_snapshot = random.randint(1, 0x10000)
+        h_snapshot = HandleManager.create_handle()
         ProcessList = VMM.process_list()
         writer.write_int32(h_snapshot)
 
@@ -378,7 +378,7 @@ def handler(ns, command, thread_count):
                 writer.write_int32(id)
         else:
             ProcessList = VMM.process_list()
-            h_snapshot = random.randint(1, 0x10000)
+            h_snapshot = HandleManager.create_handle()
             writer.write_int32(h_snapshot)
 
     elif command == CECMD.CMD_PROCESS32FIRST or command == CECMD.CMD_PROCESS32NEXT:
@@ -460,7 +460,7 @@ def handler(ns, command, thread_count):
     elif command == CECMD.CMD_OPENPROCESS:
         pid = reader.read_int32()
         Process = [p for p in ProcessList if p.pid == pid][0]
-        processhandle = random.randint(0, 0x10000)
+        processhandle = HandleManager.create_handle()
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
@@ -647,7 +647,7 @@ def handler(ns, command, thread_count):
         _handle = reader.read_int32()
         _startaddress = reader.read_uint64()
         _parameter = reader.read_uint64()
-        _threadhandle = random.randint(0, 0x10000)
+        _threadhandle = HandleManager.create_handle()
         writer.write_int32(0)
 
     elif command == CECMD.CMD_GETABI:
@@ -720,7 +720,7 @@ def handler(ns, command, thread_count):
     elif command == CECMD.CMD_OPENNAMEDPIPE:
         _pipename = reader.read_string16()
         _timeout = reader.read_uint32()
-        pipehandle = random.randint(1, 0x10000)
+        pipehandle = HandleManager.create_handle()
         writer.write_int32(pipehandle)
 
     elif command == CECMD.CMD_PIPEREAD:
