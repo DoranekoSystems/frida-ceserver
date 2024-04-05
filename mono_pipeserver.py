@@ -315,6 +315,10 @@ def handler(command):
         yield 0
         klass = READER.read_uint64()
         API.IsValueTypeClass(klass)
+    elif command == CEPIPECMD.MONOCMD_FILLOPTIONALFUNCTIONLIST:
+        yield 0
+        _mono_type_get_name_full = READER.read_uint64()
+        WRITER.write_int8(1)
     else:
         pass
     yield 1

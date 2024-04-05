@@ -1079,6 +1079,7 @@ def handler(ns, nc, command, thread_count):
         handle = reader.read_int32()
         prefered_base = reader.read_uint64()
         size = reader.read_int32()
+        windowsprotection = reader.read_uint32()
         address = API.ExtAlloc(prefered_base, size)
         writer.write_uint64(address)
 
