@@ -1,5 +1,5 @@
-from enum import IntEnum
-from struct import pack, unpack
+from define import JAVAPIPECMD
+from util import PipeReadEmulator, PipeWriteEmulator
 
 WriteByte = 1
 WriteWord = 2
@@ -15,155 +15,8 @@ CLASSES_INFO = {}
 CLASSES_INFO2 = {}
 
 
-class CEPIPECMD(IntEnum):
-    JAVACMD_STARTCODECALLBACKS = 0
-    JAVACMD_STOPCODECALLBACKS = 1
-    JAVACMD_GETLOADEDCLASSES = 2
-    JAVACMD_DEREFERENCELOCALOBJECT = 3
-    JAVACMD_GETCLASSMETHODS = 4
-    JAVACMD_GETCLASSFIELDS = 5
-    JAVACMD_GETIMPLEMENTEDINTERFACES = 6
-    JAVAVMD_FINDREFERENCESTOOBJECT = 7
-    JAVACMD_FINDJOBJECT = 8
-    JAVACMD_GETCLASSSIGNATURE = 9
-    JAVACMD_GETSUPERCLASS = 10
-    JAVACMD_GETOBJECTCLASS = 11
-    JAVACMD_GETCLASSDATA = 12
-    JAVACMD_REDEFINECLASS = 13
-    JAVACMD_FINDCLASS = 14
-    JAVACMD_GETCAPABILITIES = 15
-    JAVACMD_GETMETHODNAME = 16
-    JAVACMD_INVOKEMETHOD = 17
-    JAVACMD_FINDCLASSOBJECTS = 18
-    JAVACMD_ADDTOBOOTSTRAPCLASSLOADERPATH = 19
-    JAVACMD_ADDTOSYSTEMCLASSLOADERPATH = 20
-    JAVACMD_PUSHLOCALFRAME = 21
-    JAVACMD_POPLOCALFRAME = 22
-    JAVACMD_GETFIELDDECLARINGCLASS = 23
-    JAVACMD_GETFIELDSIGNATURE = 24
-    JAVACMD_GETFIELD = 25
-    JAVACMD_SETFIELD = 26
-    JAVACMD_STARTSCAN = 27
-    JAVACMD_REFINESCANRESULTS = 28
-    JAVACMD_GETSCANRESULTS = 29
-    JAVACMD_FINDWHATWRITES = 30
-    JAVACMD_STOPFINDWHATWRITES = 31
-    JAVACMD_GETMETHODDECLARINGCLASS = 32
-
-
-class BinaryReader:
-    def __init__(self):
-        self.index = 0
-        self.read_message = b""
-
-    def read_int8(self):
-        result = self.read_message[self.index : self.index + 1]
-        ret = unpack("<b", result)[0]
-        self.read_message = self.read_message[self.index + 1 :]
-        return ret
-
-    def read_int16(self):
-        result = self.read_message[self.index : self.index + 2]
-        ret = unpack("<h", result)[0]
-        self.read_message = self.read_message[self.index + 2 :]
-        return ret
-
-    def read_int32(self):
-        result = self.read_message[self.index : self.index + 4]
-        ret = unpack("<i", result)[0]
-        self.read_message = self.read_message[self.index + 4 :]
-        return ret
-
-    def read_int64(self):
-        result = self.read_message[self.index : self.index + 8]
-        ret = unpack("<q", result)[0]
-        self.read_message = self.read_message[self.index + 8 :]
-        return ret
-
-    def read_uint8(self):
-        result = self.read_message[self.index : self.index + 1]
-        ret = unpack("<B", result)[0]
-        self.read_message = self.read_message[self.index + 1 :]
-        return ret
-
-    def read_uint16(self):
-        result = self.read_message[self.index : self.index + 2]
-        ret = unpack("<H", result)[0]
-        self.read_message = self.read_message[self.index + 2 :]
-        return ret
-
-    def read_uint32(self):
-        result = self.read_message[self.index : self.index + 4]
-        ret = unpack("<I", result)[0]
-        self.read_message = self.read_message[self.index + 4 :]
-        return ret
-
-    def read_uint64(self):
-        result = self.read_message[self.index : self.index + 8]
-        ret = unpack("<Q", result)[0]
-        self.read_message = self.read_message[self.index + 8 :]
-        return ret
-
-    def get_message_size(self):
-        return len(self.read_message)
-
-    def write_message(self, message):
-        self.read_message += message
-
-
-class BinaryWriter:
-    def __init__(self):
-        self.write_message = b""
-
-    def write_int8(self, number):
-        i8 = pack("<b", number)
-        self.write_message += i8
-
-    def write_int16(self, number):
-        i16 = pack("<h", number)
-        self.write_message += i16
-
-    def write_int32(self, number):
-        i32 = pack("<i", number)
-        self.write_message += i32
-
-    def write_int64(self, number):
-        i64 = pack("<q", number)
-        self.write_message += i64
-
-    def write_uint8(self, number):
-        ui8 = pack("<B", number)
-        self.write_message += ui8
-
-    def write_uint16(self, number):
-        ui16 = pack("<H", number)
-        self.write_message += ui16
-
-    def write_uint32(self, number):
-        ui32 = pack("<I", number)
-        self.write_message += ui32
-
-    def write_uint64(self, number):
-        ui64 = pack("<Q", number)
-        self.write_message += ui64
-
-    def write_utf8_string(self, message):
-        self.write_message += message.encode()
-
-    def write_byte_array(self, message):
-        self.write_message += message
-
-    def read_message(self, size):
-        ret = self.write_message[0:size]
-        self.write_message = self.write_message[size:]
-        return ret
-
-    def get_message_size(self):
-        return len(self.write_message)
-
-
-WRITER = BinaryWriter()
-READER = BinaryReader()
+WRITER = PipeWriteEmulator()
+READER = PipeReadEmulator()
 
 
 def handler(command):
@@ -171,15 +24,15 @@ def handler(command):
     global CLASSES_INFO
     global CLASSES_INFO2
 
-    # print(str(CEPIPECMD(command)))
-    if command == CEPIPECMD.JAVACMD_STARTCODECALLBACKS:
+    # print(str(JAVAPIPECMD(command)))
+    if command == JAVAPIPECMD.JAVACMD_STARTCODECALLBACKS:
         pass
 
-    elif command == CEPIPECMD.JAVACMD_GETCAPABILITIES:
+    elif command == JAVAPIPECMD.JAVACMD_GETCAPABILITIES:
         for i in range(15):
             WRITER.WriteInt8(1)
 
-    elif command == CEPIPECMD.JAVACMD_GETLOADEDCLASSES:
+    elif command == JAVAPIPECMD.JAVACMD_GETLOADEDCLASSES:
         classes = API.GetLoadedClasses()
         WRITER.WriteInt32(len(classes))
         for _class in classes:
@@ -192,7 +45,7 @@ def handler(command):
             CLASSES_INFO[handle] = name
             CLASSES_INFO2[name] = handle
 
-    elif command == CEPIPECMD.JAVACMD_GETCLASSMETHODS:
+    elif command == JAVAPIPECMD.JAVACMD_GETCLASSMETHODS:
         yield 0
         handle = READER.ReadInt64()
         name = CLASSES_INFO[handle]
@@ -209,7 +62,7 @@ def handler(command):
             WRITER.WriteInt16(0)
             WRITER.WriteInt16(0)
 
-    elif command == CEPIPECMD.JAVACMD_GETCLASSFIELDS:
+    elif command == JAVAPIPECMD.JAVACMD_GETCLASSFIELDS:
         yield 0
         handle = READER.ReadInt64()
         name = CLASSES_INFO[handle]
@@ -222,12 +75,12 @@ def handler(command):
             WRITER.WriteInt16(0)
             WRITER.WriteInt16(0)
 
-    elif command == CEPIPECMD.JAVACMD_GETIMPLEMENTEDINTERFACES:
+    elif command == JAVAPIPECMD.JAVACMD_GETIMPLEMENTEDINTERFACES:
         yield 0
         handle = READER.ReadInt64()
         WRITER.WriteInt32(0)
 
-    elif command == CEPIPECMD.JAVACMD_GETSUPERCLASS:
+    elif command == JAVAPIPECMD.JAVACMD_GETSUPERCLASS:
         yield 0
         handle = READER.ReadInt64()
         name = CLASSES_INFO[handle]
@@ -238,7 +91,7 @@ def handler(command):
             super_class_handle = 0
         WRITER.WriteInt64(super_class_handle)
 
-    elif command == CEPIPECMD.JAVACMD_GETCLASSSIGNATURE:
+    elif command == JAVAPIPECMD.JAVACMD_GETCLASSSIGNATURE:
         yield 0
         handle = READER.ReadInt64()
         name = CLASSES_INFO[handle]
@@ -246,7 +99,7 @@ def handler(command):
         WRITER.WriteUtf8String(name)
         WRITER.WriteInt16(0)
 
-    elif command == CEPIPECMD.JAVACMD_DEREFERENCELOCALOBJECT:
+    elif command == JAVAPIPECMD.JAVACMD_DEREFERENCELOCALOBJECT:
         yield 0
         _ = READER.ReadInt64()
 
@@ -275,7 +128,7 @@ def java_process(buf):
             except Exception:
                 import traceback
 
-                print("EXCEPTION:" + str(CEPIPECMD(command)))
+                print("EXCEPTION:" + str(JAVAPIPECMD(command)))
                 traceback.print_exc()
                 return
             if ret == -1:
@@ -288,7 +141,7 @@ def java_process(buf):
             except Exception:
                 import traceback
 
-                print("EXCEPTION:" + str(CEPIPECMD(command)))
+                print("EXCEPTION:" + str(JAVAPIPECMD(command)))
                 traceback.print_exc()
                 return
 

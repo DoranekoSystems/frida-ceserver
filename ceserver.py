@@ -9,7 +9,6 @@ import subprocess
 import threading
 import time
 import zlib
-from enum import IntEnum
 from struct import pack, unpack
 
 import lz4.block
@@ -17,28 +16,53 @@ from packaging.version import parse
 
 import java_pipeserver
 import mono_pipeserver
-from define import ARCHITECTURE, MODE, OS
+from define import ARCHITECTURE, CECMD, MODE, OS, WinDef
 from lldbauto import LLDBAutomation
-from util import HandleManager
+from util import (
+    BinaryReader,
+    BinaryWriter,
+    HandleManager,
+    arch_to_number,
+)
 
-PID = 0
-API = 0
-EXTEND_API = 0
-SYMBOL_API = 0
-DEVICE = 0
-_MODE = 0
-CONFIG = 0
-ARCH = 0
-SESSION = 0
-CEVERSION = ""
-TARGETOS = 0
-MANUAL_PARSER = 0
-JAVA_INFO = 0
-NATIVE_CESERVER_IP = 0
-CUSTOM_SYMBOL_LOADER = []
-DEBUGSERVER_IP = 0
-CUSTOM_READ_MEMORY = 0
-DATA_COLLECTOR = 0
+
+class Config:
+    config = None
+    mode = ""
+    arch = ""
+    ceverion = ""
+    target_os = ""
+    manual_parser = False
+    java_info = False
+    native_ceserver_ip = ""
+    custom_symbol_loader = []
+    debugserver_ip = ""
+    custom_read_memory = False
+    data_collector = ""
+    listen_host = ""
+    listen_port = 0
+
+    @classmethod
+    def load_config(cls, config):
+        cls.config = config
+        cls.mode = config["general"]["mode"]
+        cls.arch = config["general"]["arch"]
+        cls.ceversion = config["general"]["ceversion"]
+        cls.target_os = config["general"]["target_os"]
+        cls.manual_parser = config["extended_function"]["manual_parser"]
+        cls.java_info = config["extended_function"]["java_info"]
+        cls.native_ceserver_ip = config["ipconfig"]["native_ceserver_ip"]
+        cls.custom_symbol_loader = config["extended_function"]["custom_symbol_loader"]
+        cls.debugserver_ip = config["ipconfig"]["debugserver_ip"]
+        cls.custom_read_memory = config["extended_function"]["custom_read_memory"]
+        cls.data_collector = config["extended_function"]["data_collector"]
+        cls.listen_host = config["general"]["listen_host"]
+        cls.listen_port = config["general"]["listen_port"]
+
+    @classmethod
+    def get_config(cls):
+        return cls.config
+
 
 PROCESSES = []
 LLDB = 0
@@ -60,90 +84,15 @@ IS_STOPPED = False
 
 Lock = threading.Lock()
 
-PROCESS_ALL_ACCESS = 0x1F0FFF
-
-TH32CS_SNAPPROCESS = 0x2
-TH32CS_SNAPTHREAD = 0x4
-TH32CS_SNAPMODULE = 0x8
-
-PAGE_NOACCESS = 1
-PAGE_READONLY = 2
-PAGE_READWRITE = 4
-PAGE_WRITECOPY = 8
-PAGE_EXECUTE = 16
-PAGE_EXECUTE_READ = 32
-PAGE_EXECUTE_READWRITE = 64
-
-MEM_MAPPED = 262144
-MEM_PRIVATE = 131072
-
-PROT_READ = 1
-PROT_WRITE = 2
-PROT_EXEC = 4
-
-MAP_SHARED = 1
-MAP_PRIVATE = 2
-MAP_ANONYMOUS = 32
-
-VQE_PAGEDONLY = 1
-VQE_DIRTYONLY = 2
-VQE_NOSHARED = 4
-
 RegionList = None
 ModuleList = None
 ModuleListIterator = 0
 
 
-def arch_to_number(arch):
-    if arch == ARCHITECTURE.IA32.value:
-        return 0
-    elif arch == ARCHITECTURE.X64.value:
-        return 1
-    elif arch == ARCHITECTURE.ARM.value:
-        return 2
-    elif arch == ARCHITECTURE.ARM64.value:
-        return 3
-
-
-def protection_string_to_type(protectionstring):
-    if protectionstring.find("s") != -1:
-        return MEM_MAPPED
-    else:
-        return MEM_PRIVATE
-
-
-def protection_string_to_protection(protectionstring):
-    w = 0
-    x = 0
-
-    if protectionstring.find("x") != -1:
-        x = True
-    else:
-        x = False
-
-    if protectionstring.find("w") != -1:
-        w = True
-    else:
-        w = False
-
-    if x:
-        # executable
-        if w:
-            return PAGE_EXECUTE_READWRITE
-        else:
-            return PAGE_EXECUTE_READ
-    else:
-        # not executable
-        if w:
-            return PAGE_READWRITE
-        else:
-            return PAGE_READONLY
-
-
 def virtualqueryex(address):
     global RegionList
     if RegionList is None:
-        RegionList = API.VirtualQueryExFull(VQE_NOSHARED)
+        RegionList = API.VirtualQueryExFull(WinDef.VQE_NOSHARED)
     lp_address = address
     sorts = [region[0] + region[1] for region in RegionList]
     index = bisect.bisect_left(sorts, lp_address + 1)
@@ -160,7 +109,7 @@ def virtualqueryex(address):
     else:
         base = lp_address
         size = start - lp_address
-        protection = PAGE_NOACCESS
+        protection = WinDef.PAGE_NOACCESS
         _type = 0
         filename = ""
         return [base, size, protection, _type, filename]
@@ -191,164 +140,13 @@ def module32next():
         return False
 
 
-class CECMD(IntEnum):
-    CMD_GETVERSION = 0
-    CMD_CLOSECONNECTION = 1
-    CMD_TERMINATESERVER = 2
-    CMD_OPENPROCESS = 3
-    CMD_CREATETOOLHELP32SNAPSHOT = 4
-    CMD_PROCESS32FIRST = 5
-    CMD_PROCESS32NEXT = 6
-    CMD_CLOSEHANDLE = 7
-    CMD_VIRTUALQUERYEX = 8
-    CMD_READPROCESSMEMORY = 9
-    CMD_WRITEPROCESSMEMORY = 10
-    CMD_STARTDEBUG = 11
-    CMD_STOPDEBUG = 12
-    CMD_WAITFORDEBUGEVENT = 13
-    CMD_CONTINUEFROMDEBUGEVENT = 14
-    CMD_SETBREAKPOINT = 15
-    CMD_REMOVEBREAKPOINT = 16
-    CMD_SUSPENDTHREAD = 17
-    CMD_RESUMETHREAD = 18
-    CMD_GETTHREADCONTEXT = 19
-    CMD_SETTHREADCONTEXT = 20
-    CMD_GETARCHITECTURE = 21
-    CMD_MODULE32FIRST = 22
-    CMD_MODULE32NEXT = 23
-    CMD_GETSYMBOLLISTFROMFILE = 24
-    CMD_LOADEXTENSION = 25
-    CMD_ALLOC = 26
-    CMD_FREE = 27
-    CMD_CREATETHREAD = 28
-    CMD_LOADMODULE = 29
-    CMD_SPEEDHACK_SETSPEED = 30
-    CMD_VIRTUALQUERYEXFULL = 31
-    CMD_GETREGIONINFO = 32
-    CMD_GETABI = 33
-    CMD_SET_CONNECTION_NAME = 34
-    CMD_CREATETOOLHELP32SNAPSHOTEX = 35
-    CMD_CHANGEMEMORYPROTECTION = 36
-    CMD_GETOPTIONS = 37
-    CMD_GETOPTIONVALUE = 38
-    CMD_SETOPTIONVALUE = 39
-    CMD_PTRACE_MMAP = 40
-    CMD_OPENNAMEDPIPE = 41
-    CMD_PIPEREAD = 42
-    CMD_PIPEWRITE = 43
-    CMD_GETCESERVERPATH = 44
-    CMD_ISANDROID = 45
-    CMD_AOBSCAN = 200
-    CMD_COMMANDLIST2 = 255
-
-
-def recvall(s, size, flags=0):
-    buffer = bytearray(size)
-    view = memoryview(buffer)
-    pos = 0
-    while pos < size:
-        read = s.recv_into(view[pos:], size - pos, flags)
-        if not read:
-            continue  # IncompleteReadError(bytes(view[:pos]), size)
-        pos += read
-    return bytes(buffer)
-
-
-class BinaryReader:
-    def __init__(self, base):
-        self.base = base
-
-    def read_int8(self):
-        result = recvall(self.base, 1)
-        ret = unpack("<b", result)[0]
-        return ret
-
-    def read_int16(self):
-        result = recvall(self.base, 2)
-        ret = unpack("<h", result)[0]
-        return ret
-
-    def read_int32(self):
-        result = recvall(self.base, 4)
-        ret = unpack("<i", result)[0]
-        return ret
-
-    def read_int64(self):
-        result = recvall(self.base, 8)
-        ret = unpack("<q", result)[0]
-        return ret
-
-    def read_uint8(self):
-        result = recvall(self.base, 1)
-        ret = unpack("<B", result)[0]
-        return ret
-
-    def read_uint16(self):
-        result = recvall(self.base, 2)
-        ret = unpack("<H", result)[0]
-        return ret
-
-    def read_uint32(self):
-        result = recvall(self.base, 4)
-        ret = unpack("<I", result)[0]
-        return ret
-
-    def read_uint64(self):
-        result = recvall(self.base, 8)
-        ret = unpack("<Q", result)[0]
-        return ret
-
-    def read_string16(self):
-        length = self.read_uint16()
-        result = recvall(self.base, length)
-        ret = result.decode()
-        return ret
-
-
-class BinaryWriter:
-    def __init__(self, base):
-        self.base = base
-
-    def write_int8(self, number):
-        i8 = pack("<b", number)
-        self.base.sendall(i8)
-
-    def write_int16(self, number):
-        i16 = pack("<h", number)
-        self.base.sendall(i16)
-
-    def write_int32(self, number):
-        i32 = pack("<i", number)
-        self.base.sendall(i32)
-
-    def write_int64(self, number):
-        i64 = pack("<q", number)
-        self.base.sendall(i64)
-
-    def write_uint8(self, number):
-        ui8 = pack("<B", number)
-        self.base.sendall(ui8)
-
-    def write_uint16(self, number):
-        ui16 = pack("<H", number)
-        self.base.sendall(ui16)
-
-    def write_uint32(self, number):
-        ui32 = pack("<I", number)
-        self.base.sendall(ui32)
-
-    def write_uint64(self, number):
-        ui64 = pack("<Q", number)
-        self.base.sendall(ui64)
-
-
 def get_symbollist_from_file(filename, output):
-    if TARGETOS in [OS.LINUX.value, OS.ANDROID.value] and MANUAL_PARSER:
+    if Config.target_os in [OS.LINUX.value, OS.ANDROID.value] and Config.manual_parser:
         ret = SYMBOL_API.GetSymbolListFromFile(filename)
     else:
         ret = API.GetSymbolListFromFile(filename)
-    if len(CUSTOM_SYMBOL_LOADER) > 0:
-        for symbolfile, filepath in CUSTOM_SYMBOL_LOADER.items():
+    if len(Config.custom_symbol_loader) > 0:
+        for symbolfile, filepath in Config.custom_symbol_loader.items():
             if symbolfile == filename:
                 with open(filepath, encoding="utf-8") as f:
                     jdict = json.loads(f.read().replace("\n", ""))
@@ -423,7 +221,9 @@ def debugger_thread():
 
     signal = -1
     thread = -1
-    is_debugserver = TARGETOS == OS.IOS.value or TARGETOS == OS.MAC.value
+    is_debugserver = (
+        Config.target_os == OS.IOS.value or Config.target_os == OS.MAC.value
+    )
     while True:
         IS_STOPPED = True
         c = CONTINUE_QUEUE.get(block=True)
@@ -493,7 +293,7 @@ def debugger_thread():
 
             if medata > 0x100000:
                 register_list = []
-                if ARCH == ARCHITECTURE.ARM64.value:
+                if Config.arch == ARCHITECTURE.ARM64.value:
                     for i in range(34):
                         try:
                             if i == 33:
@@ -589,7 +389,6 @@ def unload_frida_script(number_str):
 
 
 def handler(ns, nc, command, thread_count):
-    global process_id
     global LLDB
     global REGISTER_INFO
     global WP_INFO_LIST
@@ -616,7 +415,7 @@ def handler(ns, nc, command, thread_count):
         dw_flags = reader.read_int32()
         pid = reader.read_int32()
         bytecode = b""
-        if dw_flags & TH32CS_SNAPMODULE == TH32CS_SNAPMODULE:
+        if dw_flags & WinDef.TH32CS_SNAPMODULE == WinDef.TH32CS_SNAPMODULE:
             ret = module32first()
             while True:
                 if ret:
@@ -625,7 +424,7 @@ def handler(ns, nc, command, thread_count):
                     modulebase = int(ret[0], 16)
                     modulepart = 0
                     modulesize = ret[1]
-                    if parse(CEVERSION) >= parse("7.5.1"):
+                    if parse(Config.ceversion) >= parse("7.5.1"):
                         tmp = pack(
                             "<iQIIII" + str(modulenamesize) + "s",
                             1,
@@ -650,13 +449,13 @@ def handler(ns, nc, command, thread_count):
                 else:
                     break
                 ret = module32next()
-            if parse(CEVERSION) >= parse("7.5.1"):
+            if parse(Config.ceversion) >= parse("7.5.1"):
                 tmp = pack("<iQIIII", 0, 0, 0, 0, 0, 0)
             else:
                 tmp = pack("<iQIII", 0, 0, 0, 0, 0)
             bytecode = b"".join([bytecode, tmp])
             ns.sendall(bytecode)
-        elif dw_flags & TH32CS_SNAPTHREAD == TH32CS_SNAPTHREAD:
+        elif dw_flags & WinDef.TH32CS_SNAPTHREAD == WinDef.TH32CS_SNAPTHREAD:
             idlist = API.GetThreadList()
             writer.write_int32(len(idlist))
             for id in idlist:
@@ -669,7 +468,7 @@ def handler(ns, nc, command, thread_count):
         h_snapshot = reader.read_int32()
         # print("hSnapshot:" + str(h_snapshot))
         if command == CECMD.CMD_PROCESS32FIRST:
-            if _MODE == MODE.ENUM.value:
+            if Config.mode == MODE.ENUM.value:
                 PROCESSES = DEVICE.enumerate_processes()
                 process = PROCESSES.pop(0)
                 if len(PROCESSES) == 0:
@@ -679,7 +478,7 @@ def handler(ns, nc, command, thread_count):
             else:
                 ret = 1
         else:
-            if _MODE == MODE.ENUM.value:
+            if Config.mode == MODE.ENUM.value:
                 process = PROCESSES.pop(0)
                 if len(PROCESSES) == 0:
                     ret = 0
@@ -688,7 +487,7 @@ def handler(ns, nc, command, thread_count):
             else:
                 ret = 0
         if ret != 0:
-            if _MODE == MODE.ENUM.value:
+            if Config.mode == MODE.ENUM.value:
                 processname = process.name.encode()
                 processnamesize = len(processname)
                 _pid = process.pid
@@ -720,7 +519,7 @@ def handler(ns, nc, command, thread_count):
             modulebase = int(ret[0], 16)
             modulepart = 0
             modulesize = ret[1]
-            if parse(CEVERSION) >= parse("7.5.1"):
+            if parse(Config.ceversion) >= parse("7.5.1"):
                 bytecode = pack(
                     "<iQIIII" + str(modulenamesize) + "s",
                     1,
@@ -731,7 +530,7 @@ def handler(ns, nc, command, thread_count):
                     modulenamesize,
                     modulename,
                 )
-            elif parse(CEVERSION) >= parse("7.3.1"):
+            elif parse(Config.ceversion) >= parse("7.3.1"):
                 bytecode = pack(
                     "<iQIII" + str(modulenamesize) + "s",
                     1,
@@ -752,7 +551,7 @@ def handler(ns, nc, command, thread_count):
                 )
             ns.sendall(bytecode)
         else:
-            if parse(CEVERSION) >= parse("7.3.1"):
+            if parse(Config.ceversion) >= parse("7.3.1"):
                 bytecode = pack("<iQIII", 0, 0, 0, 0, 0)
             else:
                 bytecode = pack("<iQII", 0, 0, 0, 0)
@@ -772,13 +571,13 @@ def handler(ns, nc, command, thread_count):
         else:
             processhandle = HandleManager.create_handle()
 
-            if _MODE == MODE.ENUM.value:
+            if Config.mode == MODE.ENUM.value:
 
                 def on_message(message, data):
                     print(message)
 
                 SESSION = DEVICE.attach(pid)
-                if TARGETOS == OS.WINDOWS.value:
+                if Config.target_os == OS.WINDOWS.value:
                     with open("javascript/core_win.js", "r") as f:
                         jscode = f.read()
                 else:
@@ -790,9 +589,9 @@ def handler(ns, nc, command, thread_count):
                 script.on("message", on_message)
                 script.load()
                 api = script.exports_sync
-                api.SetConfig(CONFIG)
+                api.SetConfig(Config.get_config())
                 symbol_api = 0
-                if TARGETOS != OS.WINDOWS.value:
+                if Config.target_os != OS.WINDOWS.value:
                     script2 = SESSION.create_script(jscode2)
                     script2.on("message", on_message)
                     script2.load()
@@ -800,23 +599,23 @@ def handler(ns, nc, command, thread_count):
                 PID = pid
                 API = api
                 SYMBOL_API = symbol_api
-                if DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc":
-                    mono_pipeserver.mono_init(SESSION, DATA_COLLECTOR)
-                if JAVA_INFO:
+                if Config.data_collector == "mono" or Config.data_collector == "objc":
+                    mono_pipeserver.mono_init(SESSION, Config.data_collector)
+                if Config.java_info:
                     java_pipeserver.java_init(SESSION)
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
     elif command == CECMD.CMD_GETARCHITECTURE:
-        if parse(CEVERSION) >= parse("7.4.1"):
+        if parse(Config.ceversion) >= parse("7.4.1"):
             handle = reader.read_int32()
-        arch_number = arch_to_number(ARCH)
+        arch_number = arch_to_number(Config.arch)
         writer.write_int8(arch_number)
 
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
         size = reader.read_int32()
         name = ns.recv(size).decode()
-        print(f"This thread is called {name}")
+        # print(f"This thread is called {name}")
 
     elif command == CECMD.CMD_READPROCESSMEMORY:
         handle = reader.read_uint32()
@@ -855,7 +654,7 @@ def handler(ns, nc, command, thread_count):
         if compress == 0:
             if ret:
                 # iOS
-                if CUSTOM_READ_MEMORY and TARGETOS == OS.IOS.value:
+                if Config.custom_read_memory and Config.target_os == OS.IOS.value:
                     decompress_bytes = b""
                     tmp = ret
                     last_uncompressed = b""
@@ -873,7 +672,7 @@ def handler(ns, nc, command, thread_count):
                         decompress_bytes += last_uncompressed
                     ret = decompress_bytes
                 # Android
-                elif CUSTOM_READ_MEMORY and TARGETOS == OS.ANDROID.value:
+                elif Config.custom_read_memory and Config.target_os == OS.ANDROID.value:
                     uncompressed_size = unpack("<I", ret[-4:])[0]
                     decompress_bytes = lz4.block.decompress(ret[:-4], uncompressed_size)
                     ret = decompress_bytes
@@ -1029,16 +828,16 @@ def handler(ns, nc, command, thread_count):
         return -1
 
     elif command == CECMD.CMD_GETVERSION:
-        if parse(CEVERSION) >= parse("7.5.1"):
+        if parse(Config.ceversion) >= parse("7.5.1"):
             version = 6
             versionstring = "CHEATENGINE Network 2.3".encode()
-        elif parse(CEVERSION) >= parse("7.4.3"):
+        elif parse(Config.ceversion) >= parse("7.4.3"):
             version = 5
             versionstring = "CHEATENGINE Network 2.2".encode()
-        elif parse(CEVERSION) >= parse("7.4.2"):
+        elif parse(Config.ceversion) >= parse("7.4.2"):
             version = 4
             versionstring = "CHEATENGINE Network 2.2".encode()
-        elif parse(CEVERSION) >= parse("7.3.2"):
+        elif parse(Config.ceversion) >= parse("7.3.2"):
             version = 2
             versionstring = "CHEATENGINE Network 2.1".encode()
         else:
@@ -1051,7 +850,7 @@ def handler(ns, nc, command, thread_count):
         ns.sendall(bytecode)
 
     elif command == CECMD.CMD_GETSYMBOLLISTFROMFILE:
-        if parse(CEVERSION) >= parse("7.5.1"):
+        if parse(Config.ceversion) >= parse("7.5.1"):
             reader.read_uint32()
             symbolpathsize = reader.read_uint32()
             symbolname = ns.recv(symbolpathsize).decode()
@@ -1113,8 +912,8 @@ def handler(ns, nc, command, thread_count):
 
     elif command == CECMD.CMD_STARTDEBUG:
         handle = reader.read_int32()
-        target_ip = DEBUGSERVER_IP.split(":")[0]
-        target_port = int(DEBUGSERVER_IP.split(":")[1])
+        target_ip = Config.debugserver_ip.split(":")[0]
+        target_port = int(Config.debugserver_ip.split(":")[1])
 
         LLDB = LLDBAutomation(target_ip, target_port)
         LLDB.attach(PID)
@@ -1237,11 +1036,11 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_GETTHREADCONTEXT:
         handle = reader.read_int32()
         tid = reader.read_int32()
-        if parse(CEVERSION) < parse("7.4.2"):
+        if parse(Config.ceversion) < parse("7.4.2"):
             _type = reader.read_int32()
         writer.write_int32(1)
-        if ARCH == ARCHITECTURE.ARM64.value:
-            if parse(CEVERSION) >= parse("7.4.2"):
+        if Config.arch == ARCHITECTURE.ARM64.value:
+            if parse(Config.ceversion) >= parse("7.4.2"):
                 writer.write_int32(808)  # structsize
                 ### Context ###
                 writer.write_int32(808)  # structsize
@@ -1262,7 +1061,7 @@ def handler(ns, nc, command, thread_count):
                     ns.sendall(b"\x00" * 8 * 34)
 
     elif command == CECMD.CMD_SETTHREADCONTEXT:
-        if parse(CEVERSION) >= parse("7.4.2"):
+        if parse(Config.ceversion) >= parse("7.4.2"):
             handle = reader.read_int32()
             tid = reader.read_int32()
             structsize = reader.read_int32()
@@ -1287,15 +1086,15 @@ def handler(ns, nc, command, thread_count):
         size = reader.read_int32()
         windowsprotection = reader.read_int32()
         newprotectionstr = "---"
-        if windowsprotection == PAGE_EXECUTE_READWRITE:
+        if windowsprotection == WinDef.PAGE_EXECUTE_READWRITE:
             newprotectionstr = "rwx"
-        elif windowsprotection == PAGE_EXECUTE_READ:
+        elif windowsprotection == WinDef.PAGE_EXECUTE_READ:
             newprotectionstr = "r-x"
-        elif windowsprotection == PAGE_EXECUTE:
+        elif windowsprotection == WinDef.PAGE_EXECUTE:
             newprotectionstr = "--x"
-        elif windowsprotection == PAGE_READWRITE:
+        elif windowsprotection == WinDef.PAGE_READWRITE:
             newprotectionstr = "rw-"
-        elif windowsprotection == PAGE_READONLY:
+        elif windowsprotection == WinDef.PAGE_READONLY:
             newprotectionstr = "r--"
         result = API.ExtChangeMemoryProtection(address, size, newprotectionstr)
         if result:
@@ -1373,53 +1172,29 @@ def main_thread(conn, native_client, thread_count):
 def ceserver(pid, api, symbol_api, config, session, device):
     global PID
     global API
-    global EXTEND_API
     global SYMBOL_API
-    global DEVICE
-    global _MODE
-    global CONFIG
-    global ARCH
     global SESSION
-    global CEVERSION
-    global TARGETOS
-    global MANUAL_PARSER
-    global JAVA_INFO
-    global NATIVE_CESERVER_IP
-    global CUSTOM_SYMBOL_LOADER
-    global DEBUGSERVER_IP
-    global CUSTOM_READ_MEMORY
-    global DATA_COLLECTOR
+    global DEVICE
+
+    Config.load_config(config)
 
     PID = pid
     API = api
     SYMBOL_API = symbol_api
     DEVICE = device
-    _MODE = config["general"]["mode"]
-    CONFIG = config
-    ARCH = config["general"]["arch"]
     SESSION = session
-    CEVERSION = config["general"]["ceversion"]
-    TARGETOS = config["general"]["target_os"]
-    MANUAL_PARSER = config["extended_function"]["manual_parser"]
-    JAVA_INFO = config["extended_function"]["java_info"]
-    NATIVE_CESERVER_IP = config["ipconfig"]["native_ceserver_ip"]
-    CUSTOM_SYMBOL_LOADER = config["extended_function"]["custom_symbol_loader"]
-    DEBUGSERVER_IP = config["ipconfig"]["debugserver_ip"]
-    CUSTOM_READ_MEMORY = config["extended_function"]["custom_read_memory"]
-    DATA_COLLECTOR = config["extended_function"]["data_collector"]
+
     if (
-        DATA_COLLECTOR == "mono" or DATA_COLLECTOR == "objc"
-    ) and _MODE != MODE.ENUM.value:
-        mono_pipeserver.mono_init(session, DATA_COLLECTOR)
-    if JAVA_INFO and _MODE != MODE.ENUM.value:
+        Config.data_collector == "mono" or Config.data_collector == "objc"
+    ) and Config.mode != MODE.ENUM.value:
+        mono_pipeserver.mono_init(session, Config.data_collector)
+    if Config.java_info and Config.mode != MODE.ENUM.value:
         java_pipeserver.java_init(SESSION)
-    listen_host = config["general"]["listen_host"]
-    listen_port = config["general"]["listen_port"]
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         thread_count = 0
-        s.bind((listen_host, listen_port))
+        s.bind((Config.listen_host, Config.listen_port))
         s.listen(32)
         s.settimeout(1)
         while True:
@@ -1427,9 +1202,9 @@ def ceserver(pid, api, symbol_api, config, session, device):
                 conn, addr = s.accept()
                 print("accept", addr)
                 native_client = 0
-                if NATIVE_CESERVER_IP != "":
-                    target_ip = NATIVE_CESERVER_IP.split(":")[0]
-                    target_port = NATIVE_CESERVER_IP.split(":")[1]
+                if Config.native_ceserver_ip != "":
+                    target_ip = Config.native_ceserver_ip.split(":")[0]
+                    target_port = Config.native_ceserver_ip.split(":")[1]
                     native_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     native_client.connect((target_ip, int(target_port)))
 

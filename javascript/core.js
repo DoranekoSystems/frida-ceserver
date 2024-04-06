@@ -377,7 +377,6 @@ rpc.exports = {
     java_info = config['extended_function']['java_info'];
     data_collector = config['extended_function']['data_collector'];
     target_os = config['general']['target_os'];
-    console.log(target_os);
     if (custom_read_memory && ['android', 'ios'].indexOf(target_os != -1)) {
       ReadProcessMemory_Init();
       console.log('ReadProcessMemory_Custom Enabled!!');
