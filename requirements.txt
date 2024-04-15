@@ -6,3 +6,4 @@ lz4
 windows-curses
 colorama
 memprocfs
+requests

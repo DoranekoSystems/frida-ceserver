@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 import zlib
+import requests
 from struct import pack, unpack
 
 import lz4.block
@@ -51,7 +52,8 @@ class Config:
         cls.target_os = config["general"]["target_os"]
         cls.manual_parser = config["extended_function"]["manual_parser"]
         cls.java_info = config["extended_function"]["java_info"]
-        cls.native_ceserver_ip = config["ipconfig"]["native_ceserver_ip"]
+        cls.native_server = config["ipconfig"]["native_server"]
+        cls.native_server_ip = config["ipconfig"]["native_server_ip"]
         cls.custom_symbol_loader = config["extended_function"]["custom_symbol_loader"]
         cls.debugserver_ip = config["ipconfig"]["debugserver_ip"]
         cls.custom_read_memory = config["extended_function"]["custom_read_memory"]
@@ -64,6 +66,7 @@ class Config:
         return cls.config
 
 
+MEMORY_SNAPSHOT = []
 PROCESSES = []
 LLDB = 0
 LLDB_REGISTER_COUNT = 255
@@ -87,6 +90,33 @@ Lock = threading.Lock()
 RegionList = None
 ModuleList = None
 ModuleListIterator = 0
+
+
+def readprocessmemory(address, size):
+    index = bisect.bisect_left(MEMORY_SNAPSHOT, address, key=lambda x: x["address"])
+
+    if (
+        index > 0
+        and MEMORY_SNAPSHOT[index - 1]["address"]
+        <= address
+        < MEMORY_SNAPSHOT[index - 1]["address"] + MEMORY_SNAPSHOT[index - 1]["size"]
+    ):
+        memory_region = MEMORY_SNAPSHOT[index - 1]
+    elif (
+        index < len(MEMORY_SNAPSHOT)
+        and MEMORY_SNAPSHOT[index]["address"]
+        <= address
+        < MEMORY_SNAPSHOT[index]["address"] + MEMORY_SNAPSHOT[index]["size"]
+    ):
+        memory_region = MEMORY_SNAPSHOT[index]
+    else:
+        return False
+
+    if address + size <= memory_region["address"] + memory_region["size"]:
+        offset = address - memory_region["address"]
+        return memory_region["data"][offset : offset + size]
+    else:
+        return False
 
 
 def virtualqueryex(address):
@@ -398,6 +428,7 @@ def handler(ns, nc, command, thread_count):
     global PID
     global API
     global SYMBOL_API
+    global MEMORY_SNAPSHOT
 
     reader = BinaryReader(ns)
     writer = BinaryWriter(ns)
@@ -565,9 +596,21 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_OPENPROCESS:
         pid = reader.read_int32()
         if nc != 0:
-            writer2.write_uint8(CECMD.CMD_OPENPROCESS)
-            writer2.write_int32(pid)
-            processhandle = reader2.read_int32()
+            if Config.native_server == "ceserver":
+                writer2.write_uint8(CECMD.CMD_OPENPROCESS)
+                writer2.write_int32(pid)
+                processhandle = reader2.read_int32()
+            else:
+                # memory-server
+                open_process_url = f"http://{Config.native_server_ip}/openprocess"
+                open_process_payload = {"pid": pid}
+                open_process_response = requests.post(
+                    open_process_url, json=open_process_payload, proxies={}
+                )
+                if open_process_response.status_code == 200:
+                    processhandle = HandleManager.create_handle()
+                else:
+                    processhandle = 0
         else:
             processhandle = HandleManager.create_handle()
 
@@ -615,84 +658,111 @@ def handler(ns, nc, command, thread_count):
     elif command == CECMD.CMD_SET_CONNECTION_NAME:
         size = reader.read_int32()
         name = ns.recv(size).decode()
-        # print(f"This thread is called {name}")
+        # print(f"This thread[{thread_count}] is called {name}")
 
     elif command == CECMD.CMD_READPROCESSMEMORY:
         handle = reader.read_uint32()
         address = reader.read_uint64()
         size = reader.read_uint32()
         compress = reader.read_int8()
-        if nc != 0:
-            writer2.write_uint8(CECMD.CMD_READPROCESSMEMORY)
-            writer2.write_uint32(handle)
-            writer2.write_uint64(address)
-            writer2.write_uint32(size)
-            writer2.write_int8(compress)
-            if compress == 0:
-                read = reader2.read_uint32()
-                if read == 0:
-                    ret = False
-                else:
-                    ret = b""
-                    while True:
-                        ret += nc.recv(4096)
-                        if len(ret) == read:
-                            break
-            else:
-                uncompressed_size = reader2.read_uint32()
-                compressed_size = reader2.read_uint32()
-                if compressed_size == 0:
-                    ret = False
-                else:
-                    ret = b""
-                    while True:
-                        ret += nc.recv(4096)
-                        if len(ret) == compressed_size:
-                            break
-        else:
-            ret = API.ReadProcessMemory(address, size)
-        if compress == 0:
+        if MEMORY_SNAPSHOT != []:
+            ret = readprocessmemory(address, size)
             if ret:
-                # iOS
-                if Config.custom_read_memory and Config.target_os == OS.IOS.value:
-                    decompress_bytes = b""
-                    tmp = ret
-                    last_uncompressed = b""
-                    # todo:bv4-
-                    while True:
-                        if (tmp[0:4] != b"bv41") or (tmp[0:4] == b"bv4$"):
-                            break
-                        uncompressed_size, compressed_size = unpack("<II", tmp[4:12])
-                        last_uncompressed = lz4.block.decompress(
-                            tmp[12 : 12 + compressed_size],
-                            uncompressed_size,
-                            dict=last_uncompressed,
-                        )
-                        tmp = tmp[12 + compressed_size :]
-                        decompress_bytes += last_uncompressed
-                    ret = decompress_bytes
-                # Android
-                elif Config.custom_read_memory and Config.target_os == OS.ANDROID.value:
-                    uncompressed_size = unpack("<I", ret[-4:])[0]
-                    decompress_bytes = lz4.block.decompress(ret[:-4], uncompressed_size)
-                    ret = decompress_bytes
                 writer.write_int32(len(ret))
                 ns.sendall(ret)
             else:
                 writer.write_int32(0)
         else:
-            if ret:
-                if nc != 0:
-                    compress_data = ret
+            if nc != 0:
+                if Config.native_server == "ceserver":
+                    writer2.write_uint8(CECMD.CMD_READPROCESSMEMORY)
+                    writer2.write_uint32(handle)
+                    writer2.write_uint64(address)
+                    writer2.write_uint32(size)
+                    writer2.write_int8(compress)
+                    if compress == 0:
+                        read = reader2.read_uint32()
+                        if read == 0:
+                            ret = False
+                        else:
+                            ret = b""
+                            while True:
+                                ret += nc.recv(4096)
+                                if len(ret) == read:
+                                    break
+                    else:
+                        uncompressed_size = reader2.read_uint32()
+                        compressed_size = reader2.read_uint32()
+                        if compressed_size == 0:
+                            ret = False
+                        else:
+                            ret = b""
+                            while True:
+                                ret += nc.recv(4096)
+                                if len(ret) == compressed_size:
+                                    break
                 else:
-                    uncompressed_size = len(ret)
-                    compress_data = zlib.compress(ret, level=compress)
-                writer.write_int32(uncompressed_size)
-                writer.write_int32(len(compress_data))
-                ns.sendall(compress_data)
+                    # memory-server
+                    read_memory_url = f"http://{Config.native_server_ip}/readmemory"
+                    read_memory_payload = {"address": address, "size": size}
+                    read_memory_response = requests.get(
+                        read_memory_url, params=read_memory_payload, proxies={}
+                    )
+                    if read_memory_response.status_code == 200:
+                        ret = read_memory_response.content
+                    else:
+                        ret = False
             else:
-                writer.write_int32(0)
-                writer.write_int32(0)
+                ret = API.ReadProcessmemory(address, size)
+            if compress == 0:
+                if ret:
+                    # iOS
+                    if Config.custom_read_memory and Config.target_os == OS.IOS.value:
+                        decompress_bytes = b""
+                        tmp = ret
+                        last_uncompressed = b""
+                        # todo:bv4-
+                        while True:
+                            if (tmp[0:4] != b"bv41") or (tmp[0:4] == b"bv4$"):
+                                break
+                            uncompressed_size, compressed_size = unpack(
+                                "<II", tmp[4:12]
+                            )
+                            last_uncompressed = lz4.block.decompress(
+                                tmp[12 : 12 + compressed_size],
+                                uncompressed_size,
+                                dict=last_uncompressed,
+                            )
+                            tmp = tmp[12 + compressed_size :]
+                            decompress_bytes += last_uncompressed
+                        ret = decompress_bytes
+                    # Android
+                    elif (
+                        Config.custom_read_memory
+                        and Config.target_os == OS.ANDROID.value
+                    ):
+                        uncompressed_size = unpack("<I", ret[-4:])[0]
+                        decompress_bytes = lz4.block.decompress(
+                            ret[:-4], uncompressed_size
+                        )
+                        ret = decompress_bytes
+                    writer.write_int32(len(ret))
+                    ns.sendall(ret)
+                else:
+                    writer.write_int32(0)
+            else:
+                if ret:
+                    if nc != 0 and Config.native_server == "ceserver":
+                        compress_data = ret
+                    else:
+                        uncompressed_size = len(ret)
+                        compress_data = zlib.compress(ret, level=compress)
+                    writer.write_int32(uncompressed_size)
+                    writer.write_int32(len(compress_data))
+                    ns.sendall(compress_data)
+                else:
+                    writer.write_int32(0)
+                    writer.write_int32(0)
 
     elif command == CECMD.CMD_WRITEPROCESSMEMORY:
         handle = reader.read_uint32()
@@ -715,6 +785,78 @@ def handler(ns, nc, command, thread_count):
                 else:
                     if str(address) in script_dict:
                         unload_frida_script(str(address))
+                ret = True
+            elif address == 101:
+                if _buf == b"\x01":
+                    MAX_CHUNK_SIZE = 1024 * 1024 * 64  # 64 MB
+
+                    def split_regions_if_necessary(regions):
+                        split_regions = []
+                        for region in regions:
+                            address = region["address"]
+                            size = region["size"]
+                            if size > MAX_CHUNK_SIZE:
+                                start = address
+                                while size > 0:
+                                    current_chunk_size = min(size, MAX_CHUNK_SIZE)
+                                    split_regions.append(
+                                        {"address": start, "size": current_chunk_size}
+                                    )
+                                    start += current_chunk_size
+                                    size -= current_chunk_size
+                            else:
+                                split_regions.append({"address": address, "size": size})
+                        return split_regions
+
+                    MEMORY_SNAPSHOT = []
+                    print("MEMORY_SNAPSHOT ENABLED")
+                    # memory-server
+                    regions = API.VirtualQueryExFull(0)
+                    read_memory_multiple_url = (
+                        f"http://{Config.native_server_ip}/readmemories"
+                    )
+                    read_memory_multiple_payload = split_regions_if_necessary(
+                        [{"address": x[0], "size": x[1]} for x in regions]
+                    )
+                    read_memory_multiple_response = requests.post(
+                        read_memory_multiple_url,
+                        json=read_memory_multiple_payload,
+                        proxies={},
+                    )
+                    if read_memory_multiple_response.status_code == 200:
+                        ret = read_memory_multiple_response.content
+                    else:
+                        ret = False
+                    if ret:
+                        tmp = ret
+                        for region in read_memory_multiple_payload:
+                            address = region["address"]
+                            size = region["size"]
+                            is_success = unpack("<I", tmp[:4])[0]
+                            if is_success == 1:
+                                compressed_size = unpack("<I", tmp[4:8])[0] - 4
+                                uncompressed_size = unpack("<I", tmp[8:12])[0]
+                                decompress_bytes = lz4.block.decompress(
+                                    tmp[12 : 12 + compressed_size],
+                                    uncompressed_size=uncompressed_size,
+                                )
+                                tmp = tmp[12 + compressed_size :]
+                                MEMORY_SNAPSHOT.append(
+                                    {
+                                        "address": address,
+                                        "size": size,
+                                        "uncompressed_size": uncompressed_size,
+                                        "data": decompress_bytes,
+                                    }
+                                )
+                            else:
+                                tmp = tmp[4:]
+                            if len(tmp) == 0:
+                                break
+                        print("MEMORY_SNAPSHOT SET")
+                else:
+                    print("MEMORY_SNAPSHOT DISABLED")
+                    MEMORY_SNAPSHOT = []
                 ret = True
             else:
                 # Address == 0xFFFFFFFFFFFFFFFF => ExtendCommand
@@ -1202,11 +1344,19 @@ def ceserver(pid, api, symbol_api, config, session, device):
                 conn, addr = s.accept()
                 print("accept", addr)
                 native_client = 0
-                if Config.native_ceserver_ip != "":
-                    target_ip = Config.native_ceserver_ip.split(":")[0]
-                    target_port = Config.native_ceserver_ip.split(":")[1]
-                    native_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    native_client.connect((target_ip, int(target_port)))
+                if Config.native_server_ip != "":
+                    if Config.native_server == "ceserver":
+                        target_ip = Config.native_server_ip.split(":")[0]
+                        target_port = Config.native_server_ip.split(":")[1]
+                        native_client = socket.socket(
+                            socket.AF_INET, socket.SOCK_STREAM
+                        )
+                        native_client.connect((target_ip, int(target_port)))
+                    else:
+                        # "memory-server"
+                        native_client = socket.socket(
+                            socket.AF_INET, socket.SOCK_STREAM
+                        )
 
                 conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                 # conn.settimeout(5000)
