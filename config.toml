@@ -19,7 +19,7 @@ listen_port = 52736
 [frida.ipconfig]
 frida_server_ip =  ""
 # ceserver or memory-server
-native_server = ""
+native_server = "ceserver"
 native_server_ip =  ""
 debugserver_ip =  ""
  

@@ -614,38 +614,38 @@ def handler(ns, nc, command, thread_count):
         else:
             processhandle = HandleManager.create_handle()
 
-            if Config.mode == MODE.ENUM.value:
+        if Config.mode == MODE.ENUM.value:
 
-                def on_message(message, data):
-                    print(message)
+            def on_message(message, data):
+                print(message)
 
-                SESSION = DEVICE.attach(pid)
-                if Config.target_os == OS.WINDOWS.value:
-                    with open("javascript/core_win.js", "r") as f:
-                        jscode = f.read()
-                else:
-                    with open("javascript/core.js", "r") as f:
-                        jscode = f.read()
-                    with open("javascript/symbol.js", "r") as f:
-                        jscode2 = f.read()
-                script = SESSION.create_script(jscode)
-                script.on("message", on_message)
-                script.load()
-                api = script.exports_sync
-                api.SetConfig(Config.get_config())
-                symbol_api = 0
-                if Config.target_os != OS.WINDOWS.value:
-                    script2 = SESSION.create_script(jscode2)
-                    script2.on("message", on_message)
-                    script2.load()
-                    symbol_api = script2.exports_sync
-                PID = pid
-                API = api
-                SYMBOL_API = symbol_api
-                if Config.data_collector == "mono" or Config.data_collector == "objc":
-                    mono_pipeserver.mono_init(SESSION, Config.data_collector)
-                if Config.java_info:
-                    java_pipeserver.java_init(SESSION)
+            SESSION = DEVICE.attach(pid)
+            if Config.target_os == OS.WINDOWS.value:
+                with open("javascript/core_win.js", "r") as f:
+                    jscode = f.read()
+            else:
+                with open("javascript/core.js", "r") as f:
+                    jscode = f.read()
+                with open("javascript/symbol.js", "r") as f:
+                    jscode2 = f.read()
+            script = SESSION.create_script(jscode)
+            script.on("message", on_message)
+            script.load()
+            api = script.exports_sync
+            api.SetConfig(Config.get_config())
+            symbol_api = 0
+            if Config.target_os != OS.WINDOWS.value:
+                script2 = SESSION.create_script(jscode2)
+                script2.on("message", on_message)
+                script2.load()
+                symbol_api = script2.exports_sync
+            PID = pid
+            API = api
+            SYMBOL_API = symbol_api
+            if Config.data_collector == "mono" or Config.data_collector == "objc":
+                mono_pipeserver.mono_init(SESSION, Config.data_collector)
+            if Config.java_info:
+                java_pipeserver.java_init(SESSION)
         print("Processhandle:" + str(processhandle))
         writer.write_int32(processhandle)
 
