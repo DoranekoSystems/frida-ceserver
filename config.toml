@@ -1,29 +1,58 @@
 # https://github.com/DoranekoSystems/frida-ceserver/wiki/Config
 [base]
-# frida or memprocfs
+### Must be set up ###
+# list:[frida,memprocfs]
 engine = "frida"
 
 [frida.general]
-target =  ""
+### Must be set up ###
+# list:[windows,linux,mac,android,ios]
 target_os = "ios"
-# attach spawn enum
+# list:[attach,spawn,enum]
+# description:
+# attach => Attach to a process already running
+# spawn => Spawn a new process
+# enum => Start without specifying a process and select the process to be attached from the CE process list
 mode =  "attach"
-binary_path = ""
-# ia32 x64 arm arm64
+# list:[ia32,x64,arm,arm64]
+# description:
+# Specify the architecture of the target process
 arch = "arm64"
+# description:
+# Cheat Engine version
 ceversion =  "7.5.2"
+# description:
 # Setting it to '0.0.0.0' allows connections from other PC
 listen_host = "127.0.0.1"
+# description:
+# Listen port
 listen_port = 52736
 
-[frida.ipconfig]
+### Optional ###
+# description:
+# Specify when connecting to frida-server via network
 frida_server_ip =  ""
-# ceserver or memory-server
+# description:
+# Specified to omit arguments at startup when mode is attach or spawn
+target =  ""
+# descrption:
+# Specify the full path of the target binary when mode is spawn and target_os is windows,linux,mac
+binary_path = ""
+
+[frida.supporter]
+### Description ###
+# Memory reading and debugging outside of frida
+
+### Optional ###
+# list:[ceserver,memory-server]
 native_server = "ceserver"
+# description:
+# Specify the address and port that native_server is listening on(example:192.168.11.11:52734)
 native_server_ip =  ""
 debugserver_ip =  ""
  
 [frida.ssh_auto]
+### Basically don't need to set up here ###
 enable = false
 ip = ""
 username = ""
@@ -32,26 +61,35 @@ ceserver_path =""
 debugserver_path = ""
 
 [frida.adb_auto]
+### Basically don't need to set up here ###
 enable = false
 frida_server_path = ""
 ceserver_path = ""
 gdbserver_path = ""
 
 [frida.extended_function]
+### Basically don't need to set up here ###
 custom_read_memory = false
 fix_module_size =  false
 manual_parser = false
 java_info  = false
 custom_symbol_loader =  ""
-# mono:il2cpp_data_collector
+# list:[mono]
 data_collector = ""
 
 [memprocfs.general]
 # example:"pmem://C:\\pmem\\winpmem_x64.sys"
 device = ""
-# ia32 x64 arm arm64
+# list:[ia32,x64,arm,arm64]
+# description:
+# Specify the architecture of the target process
 arch = "x64"
+# description:
+# Cheat Engine version
 ceversion =  "7.5.2"
+# description:
 # Setting it to '0.0.0.0' allows connections from other PC
 listen_host = "127.0.0.1"
+# description:
+# Listen port
 listen_port = 52736

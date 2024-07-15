@@ -55,7 +55,7 @@ def get_device():
 def main(package, pid=None, run_mode=None, memory_address=None):
     target_os = config["general"]["target_os"]
     mode = config["general"]["mode"]
-    frida_server_ip = config["ipconfig"]["frida_server_ip"]
+    frida_server_ip = config["general"]["frida_server_ip"]
     binary_path = config["general"]["binary_path"]
 
     adb_auto = config["adb_auto"]
