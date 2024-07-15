@@ -61,9 +61,10 @@ python main.py
 
 ```
 
-Then, connect to the Cheat Engine in network mode.
+Then, connect to the Cheat Engine in network mode.  
 
-The debugger is currently under development!
+frida-ceserver is listening for network connections on host pc.  
+From the cheat engine it connects to ```127.0.0.1:52736``` on localhost with the default configuration (adb forward is not required, even for android).
 
 ![img](https://user-images.githubusercontent.com/56913432/120924433-baa86600-c70e-11eb-8794-ab5c28ec50b6.png)
 
@@ -72,8 +73,6 @@ The debugger is currently under development!
 <img width="360" alt="datawp" src="https://github.com/DoranekoSystems/frida-ceserver/assets/96031346/08a9de4f-eac1-4ad2-a231-f8260bebfdcb">
 
 # wiki
-
-[BinUtils](https://github.com/DoranekoSystems/frida-ceserver/wiki/BinUtils 'BinUtils')
 
 [Config](https://github.com/DoranekoSystems/frida-ceserver/wiki/Config 'Config')
 
