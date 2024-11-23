@@ -23,20 +23,24 @@ const CMD_WriteUtf8String = 5;
 
 var il2cpp = true;
 
-function WriteByte(value) {
-  send([CMD_WriteByte, value]);
+function WriteByte(tid, value) {
+  send({ tid: tid, info: [CMD_WriteByte, value] });
 }
-function WriteWord(value) {
-  send([CMD_WriteWord, value]);
+
+function WriteWord(tid, value) {
+  send({ tid: tid, info: [CMD_WriteWord, value] });
 }
-function WriteDword(value) {
-  send([CMD_WriteDword, value]);
+
+function WriteDword(tid, value) {
+  send({ tid: tid, info: [CMD_WriteDword, value] });
 }
-function WriteQword(value) {
-  send([CMD_WriteQword, value]);
+
+function WriteQword(tid, value) {
+  send({ tid: tid, info: [CMD_WriteQword, value] });
 }
-function WriteUtf8String(message) {
-  send([CMD_WriteUtf8String, message]);
+
+function WriteUtf8String(tid, message) {
+  send({ tid: tid, info: [CMD_WriteUtf8String, message] });
 }
 
 var coreLibraryName = '';
@@ -419,48 +423,48 @@ var il2cpp_string_charsPtr = Module.findExportByName(coreLibraryName, 'il2cpp_st
 
 // var mono_selfthread = mono_thread_attach(mono_domain_get());
 
-function InitMono() {
-  WriteQword(parseInt(hMono));
+function InitMono(tid) {
+  WriteQword(tid, parseInt(hMono));
 }
 
-function EnumAssemblies() {
+function EnumAssemblies(tid) {
   var nrofassemblies = Memory.alloc(4);
   var assemblies = il2cpp_domain_get_assemblies(mono_domain_get(), nrofassemblies);
 
-  WriteDword(parseInt(nrofassemblies.readU32()));
+  WriteDword(tid, parseInt(nrofassemblies.readU32()));
   for (var i = 0; i < parseInt(nrofassemblies.readU32()); i++)
-    WriteQword(parseInt(assemblies.add(i * 8).readU64()));
+    WriteQword(tid, parseInt(assemblies.add(i * 8).readU64()));
 }
 
-function GetImageFromAssembly(assembly) {
+function GetImageFromAssembly(tid, assembly) {
   var image = mono_assembly_get_image(ptr(assembly));
-  WriteQword(parseInt(image));
+  WriteQword(tid, parseInt(image));
 }
 
-function EnumClassesInImage(image) {
+function EnumClassesInImage(tid, image) {
   var count = il2cpp_image_get_class_count(ptr(image));
-  WriteDword(count);
+  WriteDword(tid, count);
   for (var i = 0; i < count; i++) {
     var c = il2cpp_image_get_class(ptr(image), i);
-    WriteQword(parseInt(c));
+    WriteQword(tid, parseInt(c));
     if (parseInt(c) != 0) {
       var name = mono_class_get_name(c).readUtf8String();
-      WriteWord(name.length);
-      WriteUtf8String(name);
+      WriteWord(tid, name.length);
+      WriteUtf8String(tid, name);
 
       name = mono_class_get_namespace(c).readUtf8String();
-      WriteWord(name.length);
-      WriteUtf8String(name);
+      WriteWord(tid, name.length);
+      WriteUtf8String(tid, name);
     }
   }
 }
 
-function EnumMethodsInClass(_class) {
+function EnumMethodsInClass(tid, _class) {
   var iter = Memory.alloc(8);
 
   while (true) {
     var method = mono_class_get_methods(ptr(_class), iter);
-    WriteQword(parseInt(method));
+    WriteQword(tid, parseInt(method));
 
     if (parseInt(method) != 0) {
       var name;
@@ -469,132 +473,132 @@ function EnumMethodsInClass(_class) {
       name = mono_method_get_name(method).readUtf8String();
       flags = mono_method_get_flags(method, 0);
 
-      WriteWord(name.length);
-      WriteUtf8String(name);
-      WriteDword(flags);
+      WriteWord(tid, name.length);
+      WriteUtf8String(tid, name);
+      WriteDword(tid, flags);
     } else {
       break;
     }
   }
 }
 
-function GetFullTypeName(klass, isKlass, nameformat) {
+function GetFullTypeName(tid, klass, isKlass, nameformat) {
   var ptype = klass && isKlass ? mono_class_get_type(ptr(klass)) : ptr(klass);
   if (ptype) {
     var fullname = il2cpp_type_get_name(ptype).readUtf8String();
 
     if (fullname != '') {
-      WriteWord(fullname.length);
-      WriteUtf8String(fullname);
+      WriteWord(tid, fullname.length);
+      WriteUtf8String(tid, fullname);
     } else {
       console.log('ERROR');
     }
   } else {
-    WriteWord(0);
+    WriteWord(tid, 0);
   }
 }
 
-function GetParentClass(klass) {
+function GetParentClass(tid, klass) {
   var parent = 0;
   if (klass) parent = mono_class_get_parent(ptr(klass));
 
-  WriteQword(parseInt(parent));
+  WriteQword(tid, parseInt(parent));
 }
 
-function GetClassName(klass) {
+function GetClassName(tid, klass) {
   var classname = mono_class_get_name(ptr(klass)).readUtf8String();
-  WriteWord(classname.length);
-  WriteUtf8String(classname);
+  WriteWord(tid, classname.length);
+  WriteUtf8String(tid, classname);
 }
 
-function GetClassNameSpace(klass) {
+function GetClassNameSpace(tid, klass) {
   var classnamespace = mono_class_get_namespace(ptr(klass)).readUtf8String();
-  WriteWord(classnamespace.length);
-  WriteUtf8String(classnamespace);
+  WriteWord(tid, classnamespace.length);
+  WriteUtf8String(tid, classnamespace);
 }
 
-function GetClassImage(klass) {
+function GetClassImage(tid, klass) {
   var image = mono_class_get_image(ptr(klass));
-  WriteQword(parseInt(image));
+  WriteQword(tid, parseInt(image));
 }
 
-function IsClassGeneric(klass) {
-  WriteByte(mono_class_is_generic(ptr(klass)));
+function IsClassGeneric(tid, klass) {
+  WriteByte(tid, mono_class_is_generic(ptr(klass)));
 }
 
-function EnumFieldsInClass(klass) {
+function EnumFieldsInClass(tid, klass) {
   var iter = Memory.alloc(8);
   while (true) {
     var field = mono_class_get_fields(ptr(klass), iter);
-    WriteQword(parseInt(field));
+    WriteQword(tid, parseInt(field));
     if (parseInt(field) != 0) {
       var fieldtype = mono_field_get_type(field);
-      WriteQword(parseInt(fieldtype));
-      WriteDword(parseInt(mono_type_get_type(fieldtype)));
-      WriteQword(parseInt(mono_field_get_parent(field)));
-      WriteDword(mono_field_get_offset(field));
-      WriteDword(mono_field_get_flags(field));
+      WriteQword(tid, parseInt(fieldtype));
+      WriteDword(tid, parseInt(mono_type_get_type(fieldtype)));
+      WriteQword(tid, parseInt(mono_field_get_parent(field)));
+      WriteDword(tid, mono_field_get_offset(field));
+      WriteDword(tid, mono_field_get_flags(field));
 
       var name = mono_field_get_name(field).readUtf8String();
       var type = mono_type_get_name(fieldtype).readUtf8String();
 
-      WriteWord(name.length);
-      WriteUtf8String(name);
+      WriteWord(tid, name.length);
+      WriteUtf8String(tid, name);
 
-      WriteWord(type.length);
-      WriteUtf8String(type);
+      WriteWord(tid, type.length);
+      WriteUtf8String(tid, type);
     } else {
       break;
     }
   }
 }
 
-function GetMethodSignature(method) {
+function GetMethodSignature(tid, method) {
   var paramcount = il2cpp_method_get_param_count(ptr(method));
 
-  WriteByte(paramcount);
+  WriteByte(tid, paramcount);
 
   for (var i = 0; i < paramcount; i++) {
     var name = il2cpp_method_get_param_name(ptr(method), i).readUtf8String();
-    WriteByte(name.length);
-    WriteUtf8String(name);
+    WriteByte(tid, name.length);
+    WriteUtf8String(tid, name);
   }
 
   for (var i = 0; i < paramcount; i++) {
     var type = il2cpp_method_get_param(ptr(method), i);
     var name = il2cpp_type_get_name(type).readUtf8String();
-    WriteWord(name.length);
-    WriteUtf8String(name);
+    WriteWord(tid, name.length);
+    WriteUtf8String(tid, name);
   }
 
   var type = il2cpp_method_get_return_type(ptr(method));
   var name = il2cpp_type_get_name(type).readUtf8String();
-  WriteByte(name.length);
-  WriteUtf8String(name);
+  WriteByte(tid, name.length);
+  WriteUtf8String(tid, name);
 }
 
-function GetStaticFieldValue(vtable, field) {
+function GetStaticFieldValue(tid, vtable, field) {
   var val = Memory.alloc(8);
 
   il2cpp_field_static_get_value(ptr(field), val);
-  WriteQword(parseInt(val.readU64()));
+  WriteQword(tid, parseInt(val.readU64()));
 }
 
-function SetStaticFieldValue(vtable, field, value) {
+function SetStaticFieldValue(tid, vtable, field, value) {
   var tmp = Memory.alloc(8);
   tmp.writeU64(value);
   il2cpp_field_static_set_value(ptr(field), tmp);
 }
 
-function GetImageName(image) {
+function GetImageName(tid, image) {
   var p = mono_image_get_name(ptr(image));
   var s = p.readUtf8String();
 
-  WriteWord(s.length);
-  WriteUtf8String(s);
+  WriteWord(tid, s.length);
+  WriteUtf8String(tid, s);
 }
 
-function EnumImages() {
+function EnumImages(tid) {
   var nrofassemblies = Memory.alloc(4);
   var assemblies = il2cpp_domain_get_assemblies(mono_domain_get(), nrofassemblies);
   var reply = Memory.alloc(1000000);
@@ -615,7 +619,7 @@ function EnumImages() {
   return reply.readByteArray(reply_pos);
 }
 
-function EnumClassesInImagex(image) {
+function EnumClassesInImagex(tid, image) {
   var count = il2cpp_image_get_class_count(ptr(image));
   var reply = Memory.alloc(1000000);
   var reply_pos = 0;
@@ -672,94 +676,94 @@ function GetFullTypeNameStr(klass, isKlass, nameformat) {
   }
 }
 
-function GetFieldClass(field) {
+function GetFieldClass(tid, field) {
   var type = field ? mono_field_get_type(ptr(field)) : 0;
   var klass = type ? mono_class_from_type(type) : 0;
-  WriteQword(parseInt(klass));
+  WriteQword(tid, parseInt(klass));
 }
 
-function IsValueTypeClass(klass) {
+function IsValueTypeClass(tid, klass) {
   if (mono_class_is_valuetype != null) {
     var flag = mono_class_is_valuetype(ptr(klass));
-    WriteByte(flag);
+    WriteByte(tid, flag);
   } else {
-    WriteByte(0);
+    WriteByte(tid, 0);
   }
 }
 
 rpc.exports = {
-  initmono: function () {
-    InitMono();
+  initmono: function (tid) {
+    InitMono(tid);
   },
-  isil2cpp: function () {
+  isil2cpp: function (tid) {
     var value = 0;
     if (il2cpp) value = 1;
-    WriteByte(value);
+    WriteByte(tid, value);
   },
-  enumassemblies: function () {
-    EnumAssemblies();
+  enumassemblies: function (tid) {
+    EnumAssemblies(tid);
   },
-  getimagefromassembly: function (assembly) {
-    GetImageFromAssembly(assembly);
+  getimagefromassembly: function (tid, assembly) {
+    GetImageFromAssembly(tid, assembly);
   },
-  getimagename: function (image) {
-    GetImageName(image);
+  getimagename: function (tid, image) {
+    GetImageName(tid, image);
   },
-  enumclassesinimage: function (image) {
-    EnumClassesInImage(image);
+  enumclassesinimage: function (tid, image) {
+    EnumClassesInImage(tid, image);
   },
-  enumdomains: function () {
+  enumdomains: function (tid) {
     return parseInt(mono_domain_get());
   },
-  enummethodsinclass: function (_class) {
-    EnumMethodsInClass(_class);
+  enummethodsinclass: function (tid, _class) {
+    EnumMethodsInClass(tid, _class);
   },
-  getfulltypename: function (klass, isKlass, nameformat) {
-    GetFullTypeName(klass, isKlass, nameformat);
+  getfulltypename: function (tid, klass, isKlass, nameformat) {
+    GetFullTypeName(tid, klass, isKlass, nameformat);
   },
-  getparentclass: function (klass) {
-    GetParentClass(klass);
+  getparentclass: function (tid, klass) {
+    GetParentClass(tid, klass);
   },
-  getclassname: function (klass) {
-    GetClassName(klass);
+  getclassname: function (tid, klass) {
+    GetClassName(tid, klass);
   },
-  getclassnamespace: function (klass) {
-    GetClassNameSpace(klass);
+  getclassnamespace: function (tid, klass) {
+    GetClassNameSpace(tid, klass);
   },
-  getclassimage: function (klass) {
-    GetClassImage(klass);
+  getclassimage: function (tid, klass) {
+    GetClassImage(tid, klass);
   },
-  isclassgeneric: function (klass) {
-    IsClassGeneric(klass);
+  isclassgeneric: function (tid, klass) {
+    IsClassGeneric(tid, klass);
   },
-  enumfieldsinclass: function (klass) {
-    EnumFieldsInClass(klass);
+  enumfieldsinclass: function (tid, klass) {
+    EnumFieldsInClass(tid, klass);
   },
-  getmethodsignature: function (method) {
-    GetMethodSignature(method);
+  getmethodsignature: function (tid, method) {
+    GetMethodSignature(tid, method);
   },
-  getstaticfieldvalue: function (vtable, field) {
-    GetStaticFieldValue(vtable, field);
+  getstaticfieldvalue: function (tid, vtable, field) {
+    GetStaticFieldValue(tid, vtable, field);
   },
-  setstaticfieldvalue: function (vtable, field, value) {
-    SetStaticFieldValue(vtable, field, value);
+  setstaticfieldvalue: function (tid, vtable, field, value) {
+    SetStaticFieldValue(tid, vtable, field, value);
   },
-  compilemethod: function (method) {
+  compilemethod: function (tid, method) {
     return parseInt(ptr(method).readU64());
   },
-  enumimages: function () {
-    return EnumImages();
+  enumimages: function (tid) {
+    return EnumImages(tid);
   },
-  enumclassesinimageex: function (image) {
-    return EnumClassesInImagex(image);
+  enumclassesinimageex: function (tid, image) {
+    return EnumClassesInImagex(tid, image);
   },
-  getfieldclass: function (field) {
-    GetFieldClass(field);
+  getfieldclass: function (tid, field) {
+    GetFieldClass(tid, field);
   },
-  isvaluetypeclass: function (klass) {
-    return IsValueTypeClass(klass);
+  isvaluetypeclass: function (tid, klass) {
+    IsValueTypeClass(tid, klass);
   },
-  getinfo: function () {
+  getinfo: function (tid) {
     var pid = Process.id;
     var info = { pid: pid };
     return info;

@@ -15,151 +15,166 @@ API = 0
 SESSION = 0
 SCRIPT = 0
 
-WRITER = PipeWriteEmulator()
-READER = PipeReadEmulator()
+THREAD_STATES = {}
 
 
-def handler(command):
+class ThreadState:
+    def __init__(self, tid):
+        self.is_command = True
+        self.handler = None
+        self.writer = PipeWriteEmulator()
+        self.reader = PipeReadEmulator()
+        self.tid = tid
+
+
+def handler(command, state):
+    tid = state.tid
+
     # print(str(MONOPIPECMD(command).name))
     if command == MONOPIPECMD.MONOCMD_INITMONO:
-        API.InitMono()
+        API.InitMono(tid)
     elif command == MONOPIPECMD.MONOCMD_ISIL2CPP:
-        API.IsIL2CPP()
+        API.IsIL2CPP(tid)
     elif command == MONOPIPECMD.MONOCMD_ENUMASSEMBLIES:
-        API.EnumAssemblies()
+        API.EnumAssemblies(tid)
     elif command == MONOPIPECMD.MONOCMD_GETIMAGEFROMASSEMBLY:
         yield 0
-        assembly = READER.read_uint64()
-        API.GetImageFromAssembly(assembly)
+        assembly = state.reader.read_uint64()
+        API.GetImageFromAssembly(tid, assembly)
     elif command == MONOPIPECMD.MONOCMD_GETIMAGENAME:
         yield 0
-        image = READER.read_uint64()
-        API.GetImageName(image)
+        image = state.reader.read_uint64()
+        API.GetImageName(tid, image)
     elif command == MONOPIPECMD.MONOCMD_ENUMCLASSESINIMAGE:
         yield 0
-        image = READER.read_uint64()
+        image = state.reader.read_uint64()
         if image == 0:
-            WRITER.write_uint32(0)
-        API.EnumClassesInImage(image)
+            state.writer.write_uint32(0)
+        API.EnumClassesInImage(tid, image)
     elif command == MONOPIPECMD.MONOCMD_ENUMDOMAINS:
-        WRITER.write_uint32(1)
-        domain = API.EnumDomains()
-        WRITER.write_uint64(domain)
+        state.writer.write_uint32(1)
+        domain = API.EnumDomains(tid)
+        state.writer.write_uint64(domain)
     elif command == MONOPIPECMD.MONOCMD_ENUMMETHODSINCLASS:
         yield 0
-        _class = READER.read_uint64()
-        API.EnumMethodsInClass(_class)
+        _class = state.reader.read_uint64()
+        API.EnumMethodsInClass(tid, _class)
     elif command == MONOPIPECMD.MONOCMD_GETCLASSNESTINGTYPE:
         yield 0
-        klass = READER.read_uint64()
-        WRITER.write_uint64(0)
+        klass = state.reader.read_uint64()
+        state.writer.write_uint64(0)
     elif command == MONOPIPECMD.MONOCMD_GETFULLTYPENAME:
         yield 0
-        klass = READER.read_uint64()
+        klass = state.reader.read_uint64()
         yield 0
-        is_klass = READER.read_uint8()
+        is_klass = state.reader.read_uint8()
         yield 0
-        nameformat = READER.read_uint32()
-        API.GetFullTypeName(klass, is_klass, nameformat)
+        nameformat = state.reader.read_uint32()
+        API.GetFullTypeName(tid, klass, is_klass, nameformat)
     elif command == MONOPIPECMD.MONOCMD_GETPARENTCLASS:
         yield 0
-        klass = READER.read_uint64()
-        API.GetParentClass(klass)
+        klass = state.reader.read_uint64()
+        API.GetParentClass(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_GETCLASSNAME:
         yield 0
-        klass = READER.read_uint64()
-        API.GetClassName(klass)
+        klass = state.reader.read_uint64()
+        API.GetClassName(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_GETCLASSNAMESPACE:
         yield 0
-        klass = READER.read_uint64()
-        API.GetClassNameSpace(klass)
+        klass = state.reader.read_uint64()
+        API.GetClassNameSpace(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_GETCLASSIMAGE:
         yield 0
-        klass = READER.read_uint64()
-        API.GetClassImage(klass)
+        klass = state.reader.read_uint64()
+        API.GetClassImage(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_ISCLASSGENERIC:
         yield 0
-        klass = READER.read_uint64()
-        API.IsClassGeneric(klass)
+        klass = state.reader.read_uint64()
+        API.IsClassGeneric(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_GETSTATICFIELDADDRESSFROMCLASS:
         yield 0
-        domain = READER.read_uint64()
+        domain = state.reader.read_uint64()
         yield 0
-        klass = READER.read_uint64()
-        WRITER.write_uint64(0)
+        klass = state.reader.read_uint64()
+        state.writer.write_uint64(0)
     elif command == MONOPIPECMD.MONOCMD_ENUMFIELDSINCLASS:
         yield 0
-        klass = READER.read_uint64()
-        API.EnumFieldsInClass(klass)
+        klass = state.reader.read_uint64()
+        API.EnumFieldsInClass(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_GETMETHODSIGNATURE:
         yield 0
-        method = READER.read_uint64()
-        API.GetMethodSignature(method)
+        method = state.reader.read_uint64()
+        API.GetMethodSignature(tid, method)
     elif command == MONOPIPECMD.MONOCMD_GETSTATICFIELDVALUE:
         yield 0
-        vtable = READER.read_uint64()
+        vtable = state.reader.read_uint64()
         yield 0
-        field = READER.read_uint64()
-        API.GetStaticFieldValue(vtable, field)
+        field = state.reader.read_uint64()
+        API.GetStaticFieldValue(tid, vtable, field)
     elif command == MONOPIPECMD.MONOCMD_SETSTATICFIELDVALUE:
         yield 0
-        vtable = READER.read_uint64()
+        vtable = state.reader.read_uint64()
         yield 0
-        field = READER.read_uint64()
+        field = state.reader.read_uint64()
         yield 0
-        val = READER.read_uint64()
-        API.SetStaticFieldValue(vtable, field, val)
+        val = state.reader.read_uint64()
+        API.SetStaticFieldValue(tid, vtable, field, val)
     elif command == MONOPIPECMD.MONOCMD_COMPILEMETHOD:
         yield 0
-        method = READER.read_uint64()
-        method_ptr = API.CompileMethod(method)
-        WRITER.write_uint64(method_ptr)
+        method = state.reader.read_uint64()
+        method_ptr = API.CompileMethod(tid, method)
+        state.writer.write_uint64(method_ptr)
     elif command == MONOPIPECMD.MONOCMD_GETMONODATACOLLECTORVERSION:
-        WRITER.write_uint32(MONO_DATACOLLECTORVERSION)
+        state.writer.write_uint32(MONO_DATACOLLECTORVERSION)
     elif command == MONOPIPECMD.MONOCMD_ENUMIMAGES:
-        data = API.EnumImages()
-        WRITER.write_uint32(len(data))
-        WRITER.write_byte_array(data)
+        data = API.EnumImages(tid)
+        state.writer.write_uint32(len(data))
+        state.writer.write_byte_array(data)
     elif command == MONOPIPECMD.MONOCMD_ENUMCLASSESINIMAGEEX:
         yield 0
-        image = READER.read_uint64()
-        data = API.EnumClassesInImageEX(image)
-        WRITER.write_uint32(len(data))
-        WRITER.write_byte_array(data)
+        image = state.reader.read_uint64()
+        data = API.EnumClassesInImageEX(tid, image)
+        state.writer.write_uint32(len(data))
+        state.writer.write_byte_array(data)
     elif command == MONOPIPECMD.MONOCMD_GETFIELDCLASS:
         yield 0
-        field = READER.read_uint64()
-        API.GetFieldClass(field)
+        field = state.reader.read_uint64()
+        API.GetFieldClass(tid, field)
     elif command == MONOPIPECMD.MONOCMD_ISCLASSVALUETYPE:
         yield 0
-        klass = READER.read_uint64()
-        API.IsValueTypeClass(klass)
+        klass = state.reader.read_uint64()
+        API.IsValueTypeClass(tid, klass)
     elif command == MONOPIPECMD.MONOCMD_FILLOPTIONALFUNCTIONLIST:
         yield 0
-        _mono_type_get_name_full = READER.read_uint64()
-        WRITER.write_int8(1)
+        _mono_type_get_name_full = state.reader.read_uint64()
+        state.writer.write_int8(1)
+    elif command == MONOPIPECMD.MONOCMD_GETVTABLEFROMCLASS:
+        yield 0
+        state.reader.read_uint64()
+        yield 0
+        state.reader.read_uint64()
+        yield 0
+        state.writer.write_int32(0)
     else:
         pass
     yield 1
 
 
-IS_COMMAND = True
-HANDLER = 0
+def mono_process(tid, buf):
+    if tid not in THREAD_STATES:
+        THREAD_STATES[tid] = ThreadState(tid)
+    state = THREAD_STATES[tid]
 
-
-def mono_process(buf):
-    global IS_COMMAND
-    global HANDLER
-    READER.write_message(buf)
-    while READER.get_message_size() > 0:
-        if IS_COMMAND:
+    state.reader.write_message(buf)
+    while state.reader.get_message_size() > 0:
+        if state.is_command:
             try:
-                IS_COMMAND = False
-                command = READER.read_uint8()
-                HANDLER = handler(command)
-                ret = HANDLER.__next__()
+                state.is_command = False
+                command = state.reader.read_uint8()
+                state.handler = handler(command, state)
+                ret = state.handler.__next__()
                 if ret == 1:
-                    IS_COMMAND = True
+                    state.is_command = True
             except Exception:
                 import traceback
 
@@ -170,34 +185,39 @@ def mono_process(buf):
                 return
         else:
             try:
-                ret = HANDLER.__next__()
+                ret = state.handler.__next__()
                 if ret == 1:
-                    IS_COMMAND = True
+                    state.is_command = True
             except Exception:
                 import traceback
 
                 print("EXCEPTION:" + str(MONOPIPECMD(command)))
                 traceback.print_exc()
+                time.sleep(10)
                 return
 
 
 def on_message(message, data):
     if message["type"] == "send":
-        _type = message["payload"][0]
-        value = message["payload"][1]
+        tid = message["payload"]["tid"]
+        _type = message["payload"]["info"][0]
+        value = message["payload"]["info"][1]
+
+        if tid not in THREAD_STATES:
+            THREAD_STATES[tid] = ThreadState(tid)
+        state = THREAD_STATES[tid]
         if _type == WriteByte:
-            WRITER.write_uint8(value)
+            state.writer.write_uint8(value)
         elif _type == WriteWord:
-            WRITER.write_uint16(value)
+            state.writer.write_uint16(value)
         elif _type == WriteDword:
-            WRITER.write_uint32(value)
+            state.writer.write_uint32(value)
         elif _type == WriteQword:
-            WRITER.write_uint64(value)
+            state.writer.write_uint64(value)
         elif _type == WriteUtf8String:
-            WRITER.write_utf8_string(value)
+            state.writer.write_utf8_string(value)
         elif _type == DecodeObject:
             pass
-            # SCRIPT.post({"type": "input", "payload": decode(value)})
     else:
         print(message)
 

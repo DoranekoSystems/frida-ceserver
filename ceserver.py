@@ -1262,7 +1262,7 @@ def handler(ns, nc, command, thread_count):
         timeout = reader.read_uint32()
         info = HandleManager.get_info(pipehandle)
         if info["name"].find("cemonodc_pid") == 0:
-            mono_writer = mono_pipeserver.WRITER
+            mono_writer = mono_pipeserver.THREAD_STATES[thread_count].writer
             ret = mono_writer.read_message(size)
         writer.write_uint32(len(ret))
         ns.sendall(ret)
@@ -1274,7 +1274,7 @@ def handler(ns, nc, command, thread_count):
         buf = ns.recv(size)
         info = HandleManager.get_info(pipehandle)
         if info["name"].find("cemonodc_pid") == 0:
-            mono_pipeserver.mono_process(buf)
+            mono_pipeserver.mono_process(thread_count, buf)
         writer.write_uint32(size)
 
     elif command == CECMD.CMD_ISANDROID:
